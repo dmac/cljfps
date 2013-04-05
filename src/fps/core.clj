@@ -9,11 +9,18 @@
 (defrecord Camera [x y z pitch yaw])
 (defrecord Cube [points color])
 
+(def movement-speed 10) ; m/s
 (def mouse-sensitivity 0.1)
 
 (defn- select-indices [coll indices]
   (let [selected-map (select-keys coll indices)]
     (into [] (map #(get selected-map %) indices))))
+
+(defn- get-time []
+  (-> (Sys/getTime) (/ (Sys/getTimerResolution)) (* 1000) double))
+
+(defn- distance-traveled [dt]
+  (-> dt (/ 1000) (* movement-speed)))
 
 (defn- set-color [[r g b]]
   (GL11/glColor3f r g b))
@@ -42,25 +49,25 @@
   ;(GL11/glTranslatef x y z))
   (GL11/glTranslatef (- x) (- y) (- z)))
 
-(defn- move-forward [camera]
+(defn- move-forward [camera distance]
   (-> camera
-      (update-in [:x] + (Math/sin (Math/toRadians (:yaw camera))))
-      (update-in [:z] - (Math/cos (Math/toRadians (:yaw camera))))))
+      (update-in [:x] + (* distance (Math/sin (Math/toRadians (:yaw camera)))))
+      (update-in [:z] - (* distance (Math/cos (Math/toRadians (:yaw camera)))))))
 
-(defn- move-backward [camera]
+(defn- move-backward [camera distance]
   (-> camera
-      (update-in [:x] - (Math/sin (Math/toRadians (:yaw camera))))
-      (update-in [:z] + (Math/cos (Math/toRadians (:yaw camera))))))
+      (update-in [:x] - (* distance (Math/sin (Math/toRadians (:yaw camera)))))
+      (update-in [:z] + (* distance (Math/cos (Math/toRadians (:yaw camera)))))))
 
-(defn- move-left [camera]
+(defn- move-left [camera distance]
   (-> camera
-      (update-in [:x] + (Math/sin (Math/toRadians (- (:yaw camera) 90))))
-      (update-in [:z] - (Math/cos (Math/toRadians (- (:yaw camera) 90))))))
+      (update-in [:x] + (* distance (Math/sin (Math/toRadians (- (:yaw camera) 90)))))
+      (update-in [:z] - (* distance (Math/cos (Math/toRadians (- (:yaw camera) 90)))))))
 
-(defn- move-right [camera]
+(defn- move-right [camera distance]
   (-> camera
-      (update-in [:x] - (Math/sin (Math/toRadians (- (:yaw camera) 90))))
-      (update-in [:z] + (Math/cos (Math/toRadians (- (:yaw camera) 90))))))
+      (update-in [:x] - (* distance (Math/sin (Math/toRadians (- (:yaw camera) 90)))))
+      (update-in [:z] + (* distance (Math/cos (Math/toRadians (- (:yaw camera) 90)))))))
 
 (defn- handle-mouse-input [game]
   (let [dx (Mouse/getDX)
@@ -69,24 +76,21 @@
         (update-in [:camera :pitch] #(mod (+ % (* dy mouse-sensitivity)) 360))
         (update-in [:camera :yaw] #(mod (+ % (* dx mouse-sensitivity)) 360)))))
 
-(defn- handle-keyboard-input [game]
+(defn- handle-keyboard-input [game dt]
   (reduce
     (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
     game
-    [[Keyboard/KEY_LEFT #(update-in % [:cube :x] - 1)]
-     [Keyboard/KEY_RIGHT #(update-in % [:cube :x] + 1)]
-     [Keyboard/KEY_DOWN #(update-in % [:cube :y] - 1)]
-     [Keyboard/KEY_UP #(update-in % [:cube :y] + 1)]
-     [Keyboard/KEY_A #(update-in % [:camera] move-left)]
-     [Keyboard/KEY_D #(update-in % [:camera] move-right)]
-     [Keyboard/KEY_S #(update-in % [:camera] move-backward)]
-     [Keyboard/KEY_W #(update-in % [:camera] move-forward)]]))
+    [[Keyboard/KEY_A #(update-in % [:camera] move-left (distance-traveled dt))]
+     [Keyboard/KEY_D #(update-in % [:camera] move-right (distance-traveled dt))]
+     [Keyboard/KEY_S #(update-in % [:camera] move-backward (distance-traveled dt))]
+     [Keyboard/KEY_W #(update-in % [:camera] move-forward (distance-traveled dt))]]))
 
 (defn- init-gl []
   (GL11/glMatrixMode GL11/GL_PROJECTION)
   (GL11/glLoadIdentity)
   (GLU/gluPerspective 70.0 (/ 800 600) 0.1 1000)
   (GL11/glMatrixMode GL11/GL_MODELVIEW)
+  (GL11/glClearColor 0 0 0 0)
   (GL11/glClearDepth 1)
   (GL11/glEnable GL11/GL_DEPTH_TEST)
   (GL11/glDepthFunc GL11/GL_LEQUAL)
@@ -101,7 +105,8 @@
 (defn run []
   (init-window 800 600)
   (init-gl)
-  (loop [game (->Game
+  (loop [last-time (get-time)
+         game (->Game
                 (->Camera 5 2 10 0 0)
                 (->Cube [[0 0 0] [0 10 0] [10 10 0] [10 0 0]
                          [0 0 -10] [0 10 -10] [10 10 -10] [10 0 -10]]
@@ -109,14 +114,15 @@
     (if (Display/isCloseRequested)
       (Display/destroy)
       (do
-        (let [new-game (-> game handle-mouse-input handle-keyboard-input)]
-          (prn game)
+        (let [new-time (get-time)
+              dt (- new-time last-time)
+              new-game (-> game handle-mouse-input (handle-keyboard-input dt))]
           (clear-screen)
           (look-through (:camera game))
           (draw new-game)
           (Display/update)
           (Display/sync 60)
-          (recur new-game))))))
+          (recur new-time new-game))))))
 
 (defn -main []
   (run))
