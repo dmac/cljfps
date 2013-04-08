@@ -7,4 +7,5 @@
                  [org.lwjgl.lwjgl/lwjgl "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl_util "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl-platform "2.8.5" :classifier "natives-osx" :native-prefix ""]]
+  :jvm-opts ["-Djava.library.path=target/native"]
   :main fps.core)

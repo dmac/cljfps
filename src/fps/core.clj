@@ -1,5 +1,6 @@
 (ns fps.core
-  (:import [org.lwjgl Sys]
+  (:import [java.nio ByteBuffer ByteOrder]
+           [org.lwjgl Sys]
            [org.lwjgl.opengl Display DisplayMode GL11]
            [org.lwjgl.util.glu GLU]
            [org.lwjgl.input Keyboard Mouse])
@@ -11,6 +12,12 @@
 
 (def movement-speed 10) ; m/s
 (def mouse-sensitivity 0.1)
+
+(defn- float-buffer [& args]
+  (-> (doto (ByteBuffer/allocateDirect 16) (.order (ByteOrder/nativeOrder)))
+      .clear .asFloatBuffer
+      (.put (float-array args))
+      .flip))
 
 (defn- select-indices [coll indices]
   (let [selected-map (select-keys coll indices)]
@@ -94,7 +101,12 @@
   (GL11/glClearDepth 1)
   (GL11/glEnable GL11/GL_DEPTH_TEST)
   (GL11/glDepthFunc GL11/GL_LEQUAL)
-  (GL11/glHint GL11/GL_PERSPECTIVE_CORRECTION_HINT GL11/GL_NICEST))
+  (GL11/glHint GL11/GL_PERSPECTIVE_CORRECTION_HINT GL11/GL_NICEST)
+  (GL11/glEnable GL11/GL_LIGHTING)
+  (GL11/glEnable GL11/GL_COLOR_MATERIAL)
+  (GL11/glColorMaterial GL11/GL_FRONT_AND_BACK GL11/GL_AMBIENT_AND_DIFFUSE)
+  (GL11/glLight GL11/GL_LIGHT0 GL11/GL_POSITION (float-buffer 5 5 0 1))
+  (GL11/glEnable GL11/GL_LIGHT0))
 
 (defn- init-window [w h]
   (Display/setDisplayMode (DisplayMode. w h))
