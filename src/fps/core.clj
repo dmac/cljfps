@@ -111,6 +111,7 @@
 (defn- init-window [w h]
   (Display/setDisplayMode (DisplayMode. w h))
   (Display/setTitle "FPS")
+  (Display/setVSyncEnabled true)
   (Display/create)
   (Mouse/setGrabbed true))
 
