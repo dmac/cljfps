@@ -1,4 +1,5 @@
 (ns fps.core
+  (:use [fps.component-entity :only [entity]])
   (:import [java.nio ByteBuffer ByteOrder]
            [org.lwjgl Sys]
            [org.lwjgl.opengl Display DisplayMode GL11]
@@ -8,9 +9,8 @@
            [org.newdawn.slick.util ResourceLoader])
   (:gen-class))
 
-(defrecord Game [camera entities])
-(defrecord Camera [x y z pitch yaw vy])
-(defrecord Box [x y z width height depth texture])
+; TODO
+; - collision detection with AABBs
 
 (def movement-speed 10) ; meters per second
 (def mouse-sensitivity 0.1)
@@ -40,19 +40,21 @@
   (GL11/glClear (bit-or GL11/GL_COLOR_BUFFER_BIT GL11/GL_DEPTH_BUFFER_BIT))
   (GL11/glLoadIdentity))
 
-(defn- box-points [{:keys [x y z width height depth] :as box}]
-  (let [w-2 (/ width 2) h-2 (/ height 2) d-2 (/ depth 2)]
-    [[(- x w-2) (- y h-2) (+ z d-2)] [(- x w-2) (+ y h-2) (+ z d-2)]
-     [(+ x w-2) (+ y h-2) (+ z d-2)] [(+ x w-2) (- y h-2) (+ z d-2)]
-     [(- x w-2) (- y h-2) (- z d-2)] [(- x w-2) (+ y h-2) (- z d-2)]
-     [(+ x w-2) (+ y h-2) (- z d-2)] [(+ x w-2) (- y h-2) (- z d-2)]]))
+(defn- bounding-points [{{:keys [x y z]} :position
+                         {:keys [width height depth]} :volume :as entity}]
+  {:pre [(and (:position entity) (:volume entity))]}
+  (let [hw (/ width 2) hh (/ height 2) hd (/ depth 2)]
+    [[(- x hw) (- y hh) (+ z hd)] [(- x hw) (+ y hh) (+ z hd)]
+     [(+ x hw) (+ y hh) (+ z hd)] [(+ x hw) (- y hh) (+ z hd)]
+     [(- x hw) (- y hh) (- z hd)] [(- x hw) (+ y hh) (- z hd)]
+     [(+ x hw) (+ y hh) (- z hd)] [(+ x hw) (- y hh) (- z hd)]]))
 
-(defn- draw-box [{:keys [texture] :as box}]
+(defn- draw-box [{{:keys [texture]} :texture :as box}]
   (set-color [1.0 1.0 1.0])
   (.bind texture)
   (GL11/glPushMatrix)
   (GL11/glBegin GL11/GL_QUADS)
-  (let [points (box-points box)
+  (let [points (bounding-points box)
         texture-points [[0 0] [0 1] [1 1] [1 0]]]
     (doseq [point-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]]
       (doseq [[[tx ty] [x y z]] (partition 2 (interleave texture-points
@@ -62,41 +64,45 @@
   (GL11/glEnd)
   (GL11/glPopMatrix))
 
-(defn- draw [{:keys [camera entities]}]
-  (doseq [entity entities]
-    (draw-box entity)))
+(defn- draw [{:keys [entities]}]
+  (doseq [entity (filter :render entities)]
+    ((get-in entity [:render :fn]) entity)))
 
-(defn- look-through [{:keys [x y z pitch yaw] :as camera}]
+(defn- look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient}]
   (GL11/glRotatef pitch 1 0 0)
   (GL11/glRotatef yaw 0 1 0)
   (GL11/glTranslatef (- x) (- y) (- z)))
 
-(defn- move-forward [camera distance]
-  (-> camera
-      (update-in [:x] + (* distance (Math/sin (Math/toRadians (:yaw camera)))))
-      (update-in [:z] - (* distance (Math/cos (Math/toRadians (:yaw camera)))))))
+(defn- move-forward [{{:keys [yaw] :as orient} :orient :as entity} distance]
+  {:pre [(and (:position entity) (:orient entity))]}
+  (-> entity
+      (update-in [:position :x] + (* distance (Math/sin (Math/toRadians yaw))))
+      (update-in [:position :z] - (* distance (Math/cos (Math/toRadians yaw))))))
 
-(defn- move-backward [camera distance]
-  (-> camera
-      (update-in [:x] - (* distance (Math/sin (Math/toRadians (:yaw camera)))))
-      (update-in [:z] + (* distance (Math/cos (Math/toRadians (:yaw camera)))))))
+(defn- move-backward [{{:keys [yaw] :as orient} :orient :as entity} distance]
+  {:pre [(and (:position entity) (:orient entity))]}
+  (-> entity
+      (update-in [:position :x] - (* distance (Math/sin (Math/toRadians yaw))))
+      (update-in [:position :z] + (* distance (Math/cos (Math/toRadians yaw))))))
 
-(defn- move-left [camera distance]
-  (-> camera
-      (update-in [:x] + (* distance (Math/sin (Math/toRadians (- (:yaw camera) 90)))))
-      (update-in [:z] - (* distance (Math/cos (Math/toRadians (- (:yaw camera) 90)))))))
+(defn- move-left [{{:keys [yaw] :as orient} :orient :as entity} distance]
+  {:pre [(and (:position entity) (:orient entity))]}
+  (-> entity
+      (update-in [:position :x] + (* distance (Math/sin (Math/toRadians (- yaw 90)))))
+      (update-in [:position :z] - (* distance (Math/cos (Math/toRadians (- yaw 90)))))))
 
-(defn- move-right [camera distance]
-  (-> camera
-      (update-in [:x] - (* distance (Math/sin (Math/toRadians (- (:yaw camera) 90)))))
-      (update-in [:z] + (* distance (Math/cos (Math/toRadians (- (:yaw camera) 90)))))))
+(defn- move-right [{{:keys [yaw] :as orient} :orient :as entity} distance]
+  {:pre [(and (:position entity) (:orient entity))]}
+  (-> entity
+      (update-in [:position :x] - (* distance (Math/sin (Math/toRadians (- yaw 90)))))
+      (update-in [:position :z] + (* distance (Math/cos (Math/toRadians (- yaw 90)))))))
 
 (defn- handle-mouse-input [game]
   (let [dx (Mouse/getDX)
         dy (- (Mouse/getDY))]
     (-> game
-        (update-in [:camera :pitch] #(mod (+ % (* dy mouse-sensitivity)) 360))
-        (update-in [:camera :yaw] #(mod (+ % (* dx mouse-sensitivity)) 360)))))
+        (update-in [:player :orient :pitch] #(mod (+ % (* dy mouse-sensitivity)) 360))
+        (update-in [:player :orient :yaw] #(mod (+ % (* dx mouse-sensitivity)) 360)))))
 
 (defn- get-key-buffer []
   (remove nil? (loop [k (Keyboard/next)
@@ -114,7 +120,7 @@
     (fn [game k]
       (cond
         (and (= k Keyboard/KEY_SPACE)
-             (= 2 (get-in game [:camera :y]))) (assoc-in game [:camera :vy] 5)
+             (= 2 (get-in game [:player :position :y]))) (assoc-in game [:player :velocity :vy] 5)
         :else game))
     game
     key-buffer))
@@ -123,20 +129,20 @@
   (reduce
     (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
     game
-    [[Keyboard/KEY_A #(update-in % [:camera] move-left (distance-traveled dt))]
-     [Keyboard/KEY_D #(update-in % [:camera] move-right (distance-traveled dt))]
-     [Keyboard/KEY_S #(update-in % [:camera] move-backward (distance-traveled dt))]
-     [Keyboard/KEY_W #(update-in % [:camera] move-forward (distance-traveled dt))]]))
+    [[Keyboard/KEY_A #(update-in % [:player] move-left (distance-traveled dt))]
+     [Keyboard/KEY_D #(update-in % [:player] move-right (distance-traveled dt))]
+     [Keyboard/KEY_S #(update-in % [:player] move-backward (distance-traveled dt))]
+     [Keyboard/KEY_W #(update-in % [:player] move-forward (distance-traveled dt))]]))
 
 (defn- tick [game dt]
-  (let [y-distance (-> dt (/ 1000) (* (get-in game [:camera :vy])))]
+  (let [y-distance (-> dt (/ 1000) (* (get-in game [:player :velocity :vy])))]
     (-> game
-        (update-in [:camera :y] + y-distance)
-        (#(if (< 2 (get-in % [:camera :y]))
-            (update-in % [:camera :vy] + (* -10 (/ dt 1000)))
+        (update-in [:player :position :y] + y-distance)
+        (#(if (< 2 (get-in % [:player :position :y]))
+            (update-in % [:player :velocity :vy] + (* -10 (/ dt 1000)))
             (-> %
-                (assoc-in [:camera :y] 2)
-                (assoc-in [:camera :vy] 0)))))))
+                (assoc-in [:player :position :y] 2)
+                (assoc-in [:player :velocity :vy] 0)))))))
 
 (defn- load-textures []
   (reset! crate-texture
@@ -173,9 +179,15 @@
   (init-window 800 600)
   (init-gl)
   (loop [last-time (get-time)
-         game (->Game
-                (->Camera 5 2 10 0 0 0)
-                [(->Box 5 5 -5 10 10 10 @crate-texture)])]
+         game {:player (entity :player
+                         (position :x 5 :y 2 :z 10)
+                         (orient :pitch 0 :yaw 0)
+                         (velocity :vy 0))
+               :entities [(entity :box
+                            (position :x 5 :y 5 :z -5)
+                            (volume :width 10 :height 10 :depth 10)
+                            (texture :texture @crate-texture)
+                            (render :fn draw-box))]}]
     (if (Display/isCloseRequested)
       (System/exit 0)
       ;(Display/destroy)
@@ -188,7 +200,7 @@
                            (handle-constant-keyboard-input dt)
                            (tick dt))]
           (clear-screen)
-          (look-through (:camera game))
+          (look-through (:player game))
           (draw new-game)
           (Display/update)
           (Display/sync 60)
