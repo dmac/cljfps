@@ -3,15 +3,19 @@
            [org.lwjgl Sys]
            [org.lwjgl.opengl Display DisplayMode GL11]
            [org.lwjgl.util.glu GLU]
-           [org.lwjgl.input Keyboard Mouse])
+           [org.lwjgl.input Keyboard Mouse]
+           [org.newdawn.slick.opengl TextureLoader]
+           [org.newdawn.slick.util ResourceLoader])
   (:gen-class))
 
-(defrecord Game [camera cube])
+(defrecord Game [camera entities])
 (defrecord Camera [x y z pitch yaw])
-(defrecord Cube [points color])
+(defrecord Box [x y z width height depth texture])
 
-(def movement-speed 10) ; m/s
+(def movement-speed 10) ; meters per second
 (def mouse-sensitivity 0.1)
+
+(def crate-texture (atom nil))
 
 (defn- float-buffer [& args]
   (-> (doto (ByteBuffer/allocateDirect 16) (.order (ByteOrder/nativeOrder)))
@@ -36,24 +40,35 @@
   (GL11/glClear (bit-or GL11/GL_COLOR_BUFFER_BIT GL11/GL_DEPTH_BUFFER_BIT))
   (GL11/glLoadIdentity))
 
-(defn- draw [{:keys [camera cube]}]
-  (set-color (:color cube))
+(defn- box-points [{:keys [x y z width height depth] :as box}]
+  (let [w-2 (/ width 2) h-2 (/ height 2) d-2 (/ depth 2)]
+    [[(- x w-2) (- y h-2) (+ z d-2)] [(- x w-2) (+ y h-2) (+ z d-2)]
+     [(+ x w-2) (+ y h-2) (+ z d-2)] [(+ x w-2) (- y h-2) (+ z d-2)]
+     [(- x w-2) (- y h-2) (- z d-2)] [(- x w-2) (+ y h-2) (- z d-2)]
+     [(+ x w-2) (+ y h-2) (- z d-2)] [(+ x w-2) (- y h-2) (- z d-2)]]))
+
+(defn- draw-box [{:keys [texture] :as box}]
+  (set-color [1.0 1.0 1.0])
+  (.bind texture)
   (GL11/glPushMatrix)
   (GL11/glBegin GL11/GL_QUADS)
-  (doseq [[x y z] (select-indices (:points cube) [0 1 2 3])] (GL11/glVertex3f x y z))
-  (set-color [0.5 1.0 0.5])
-  (doseq [[x y z] (select-indices (:points cube) [0 1 5 4])] (GL11/glVertex3f x y z))
-  (set-color [1.0 0.5 0.5])
-  (doseq [[x y z] (select-indices (:points cube) [4 5 6 7])] (GL11/glVertex3f x y z))
-  (set-color [0.5 0.5 0.5])
-  (doseq [[x y z] (select-indices (:points cube) [2 3 7 6])] (GL11/glVertex3f x y z))
+  (let [points (box-points box)
+        texture-points [[0 0] [0 1] [1 1] [1 0]]]
+    (doseq [point-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]]
+      (doseq [[[tx ty] [x y z]] (partition 2 (interleave texture-points
+                                                         (select-indices points point-indices)))]
+        (GL11/glTexCoord2f tx ty)
+        (GL11/glVertex3f x y z))))
   (GL11/glEnd)
   (GL11/glPopMatrix))
+
+(defn- draw [{:keys [camera entities]}]
+  (doseq [entity entities]
+    (draw-box entity)))
 
 (defn- look-through [{:keys [x y z pitch yaw] :as camera}]
   (GL11/glRotatef pitch 1 0 0)
   (GL11/glRotatef yaw 0 1 0)
-  ;(GL11/glTranslatef x y z))
   (GL11/glTranslatef (- x) (- y) (- z)))
 
 (defn- move-forward [camera distance]
@@ -92,6 +107,10 @@
      [Keyboard/KEY_S #(update-in % [:camera] move-backward (distance-traveled dt))]
      [Keyboard/KEY_W #(update-in % [:camera] move-forward (distance-traveled dt))]]))
 
+(defn- load-textures []
+  (reset! crate-texture
+          (TextureLoader/getTexture "PNG" (ResourceLoader/getResourceAsStream "textures/crate.png"))))
+
 (defn- init-gl []
   (GL11/glMatrixMode GL11/GL_PROJECTION)
   (GL11/glLoadIdentity)
@@ -102,11 +121,15 @@
   (GL11/glEnable GL11/GL_DEPTH_TEST)
   (GL11/glDepthFunc GL11/GL_LEQUAL)
   (GL11/glHint GL11/GL_PERSPECTIVE_CORRECTION_HINT GL11/GL_NICEST)
-  (GL11/glEnable GL11/GL_LIGHTING)
-  (GL11/glEnable GL11/GL_COLOR_MATERIAL)
-  (GL11/glColorMaterial GL11/GL_FRONT_AND_BACK GL11/GL_AMBIENT_AND_DIFFUSE)
-  (GL11/glLight GL11/GL_LIGHT0 GL11/GL_POSITION (float-buffer 5 5 0 1))
-  (GL11/glEnable GL11/GL_LIGHT0))
+  (GL11/glEnable GL11/GL_TEXTURE_2D)
+  ;; Lighting
+  ;(GL11/glEnable GL11/GL_LIGHTING)
+  ;(GL11/glEnable GL11/GL_COLOR_MATERIAL)
+  ;(GL11/glColorMaterial GL11/GL_FRONT_AND_BACK GL11/GL_AMBIENT_AND_DIFFUSE)
+  ;(GL11/glLight GL11/GL_LIGHT0 GL11/GL_POSITION (float-buffer 5 5 0 1))
+  ;(GL11/glEnable GL11/GL_LIGHT0)
+  (load-textures)
+  )
 
 (defn- init-window [w h]
   (Display/setDisplayMode (DisplayMode. w h))
@@ -121,11 +144,10 @@
   (loop [last-time (get-time)
          game (->Game
                 (->Camera 5 2 10 0 0)
-                (->Cube [[0 0 0] [0 10 0] [10 10 0] [10 0 0]
-                         [0 0 -10] [0 10 -10] [10 10 -10] [10 0 -10]]
-                        [0.5 0.5 1.0]))]
+                [(->Box 5 5 -5 10 10 10 @crate-texture)])]
     (if (Display/isCloseRequested)
-      (Display/destroy)
+      (System/exit 0)
+      ;(Display/destroy)
       (do
         (let [new-time (get-time)
               dt (- new-time last-time)

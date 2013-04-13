@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.5.0"]
                  [org.lwjgl.lwjgl/lwjgl "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl_util "2.8.5"]
-                 [org.lwjgl.lwjgl/lwjgl-platform "2.8.5" :classifier "natives-osx" :native-prefix ""]]
+                 [org.lwjgl.lwjgl/lwjgl-platform "2.8.5" :classifier "natives-osx" :native-prefix ""]
+                 [slick-util "1.0.0"]]
   :jvm-opts ["-Djava.library.path=target/native"]
   :main fps.core)
