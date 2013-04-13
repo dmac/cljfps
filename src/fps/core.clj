@@ -17,6 +17,9 @@
 
 (def crate-texture (atom nil))
 
+(defn- find-first [pred coll]
+  (first (filter pred coll)))
+
 (defn- float-buffer [& args]
   (-> (doto (ByteBuffer/allocateDirect 16) (.order (ByteOrder/nativeOrder)))
       .clear .asFloatBuffer
@@ -49,6 +52,14 @@
      [(- x hw) (- y hh) (- z hd)] [(- x hw) (+ y hh) (- z hd)]
      [(+ x hw) (+ y hh) (- z hd)] [(+ x hw) (- y hh) (- z hd)]]))
 
+(defn- collides? [{{x1 :x y1 :y z1 :z} :position {w1 :width h1 :height d1 :depth} :volume :as entity1}
+                  {{x2 :x y2 :y z2 :z} :position {w2 :width h2 :height d2 :depth} :volume :as entity2}]
+  {:pre [(and (:position entity1) (:volume entity1))
+         (and (:position entity2) (:volume entity2))]}
+  (and (< (Math/abs (- x1 x2)) (+ (/ w1 2) (/ w2 2)))
+       (< (Math/abs (- y1 y2)) (+ (/ h1 2) (/ h2 2)))
+       (< (Math/abs (- z1 z2)) (+ (/ d1 2) (/ d2 2)))))
+
 (defn- draw-box [{{:keys [texture]} :texture :as box}]
   (set-color [1.0 1.0 1.0])
   (when texture
@@ -75,29 +86,37 @@
   (GL11/glRotatef yaw 0 1 0)
   (GL11/glTranslatef (- x) (- y) (- z)))
 
-(defn- move-forward [{{:keys [yaw] :as orient} :orient :as entity} distance]
-  {:pre [(and (:position entity) (:orient entity))]}
-  (-> entity
-      (update-in [:position :x] + (* distance (Math/sin (Math/toRadians yaw))))
-      (update-in [:position :z] - (* distance (Math/cos (Math/toRadians yaw))))))
+(defn- move [entity direction distance collidables]
+  {:pre [(and (:position entity) (:orient entity))
+         (contains? #{:forward :backward :left :right} direction)]}
+  (let [yaw (get-in entity [:orient :yaw])
+        update-x-amount (case direction
+                          (:forward :backward) (* distance (Math/sin (Math/toRadians yaw)))
+                          (:left :right) (* distance (Math/sin (Math/toRadians (- yaw 90)))))
+        update-x-fn (case direction
+                      (:forward :left) +
+                      (:backward :right) -)
+        update-z-amount (case direction
+                          (:forward :backward) (* distance (Math/cos (Math/toRadians yaw)))
+                          (:left :right) (* distance (Math/cos (Math/toRadians (- yaw 90)))))
+        update-z-fn (case direction
+                      (:forward :left) -
+                      (:backward :right) +)
+        new-entity-x (update-in entity [:position :x] update-x-fn update-x-amount)
+        new-entity-z (update-in entity [:position :z] update-z-fn update-z-amount)
+        new-entity-xz (assoc-in new-entity-x [:position :z] (get-in new-entity-z [:position :z]))]
+    (or (find-first #(not-any? (partial collides? %) collidables)
+                    [new-entity-xz new-entity-x new-entity-z])
+        entity)))
 
-(defn- move-backward [{{:keys [yaw] :as orient} :orient :as entity} distance]
-  {:pre [(and (:position entity) (:orient entity))]}
-  (-> entity
-      (update-in [:position :x] - (* distance (Math/sin (Math/toRadians yaw))))
-      (update-in [:position :z] + (* distance (Math/cos (Math/toRadians yaw))))))
-
-(defn- move-left [{{:keys [yaw] :as orient} :orient :as entity} distance]
-  {:pre [(and (:position entity) (:orient entity))]}
-  (-> entity
-      (update-in [:position :x] + (* distance (Math/sin (Math/toRadians (- yaw 90)))))
-      (update-in [:position :z] - (* distance (Math/cos (Math/toRadians (- yaw 90)))))))
-
-(defn- move-right [{{:keys [yaw] :as orient} :orient :as entity} distance]
-  {:pre [(and (:position entity) (:orient entity))]}
-  (-> entity
-      (update-in [:position :x] - (* distance (Math/sin (Math/toRadians (- yaw 90)))))
-      (update-in [:position :z] + (* distance (Math/cos (Math/toRadians (- yaw 90)))))))
+(defn- move-vertical [entity distance collidables]
+  {:pre [(and (:position entity))]}
+  (let [new-entity (update-in entity [:position :y] + distance)]
+    (if (some (partial collides? new-entity) collidables)
+      (-> entity
+          (assoc-in [:velocity :vy] 0)
+          (assoc-in [:flight :airborn] false))
+      new-entity)))
 
 (defn- handle-mouse-input [game]
   (let [dx (Mouse/getDX)
@@ -122,7 +141,9 @@
     (fn [game k]
       (cond
         (and (= k Keyboard/KEY_SPACE)
-             (= 2 (get-in game [:player :position :y]))) (assoc-in game [:player :velocity :vy] 5)
+             (not (get-in game [:player :flight :airborn]))) (-> game
+                                                                 (assoc-in [:player :flight :airborn] true)
+                                                                 (assoc-in [:player :velocity :vy] 5))
         :else game))
     game
     key-buffer))
@@ -131,20 +152,21 @@
   (reduce
     (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
     game
-    [[Keyboard/KEY_A #(update-in % [:player] move-left (distance-traveled dt))]
-     [Keyboard/KEY_D #(update-in % [:player] move-right (distance-traveled dt))]
-     [Keyboard/KEY_S #(update-in % [:player] move-backward (distance-traveled dt))]
-     [Keyboard/KEY_W #(update-in % [:player] move-forward (distance-traveled dt))]]))
+    [[Keyboard/KEY_A #(update-in % [:player] move :left (distance-traveled dt) (:entities game))]
+     [Keyboard/KEY_D #(update-in % [:player] move :right (distance-traveled dt) (:entities game))]
+     [Keyboard/KEY_S #(update-in % [:player] move :backward (distance-traveled dt) (:entities game))]
+     [Keyboard/KEY_W #(update-in % [:player] move :forward (distance-traveled dt) (:entities game))]]))
 
 (defn- tick [game dt]
   (let [y-distance (-> dt (/ 1000) (* (get-in game [:player :velocity :vy])))]
     (-> game
-        (update-in [:player :position :y] + y-distance)
-        (#(if (< 2 (get-in % [:player :position :y]))
+        (update-in [:player] move-vertical y-distance (:entities game))
+        (#(if (> (get-in % [:player :position :y]) 2)
             (update-in % [:player :velocity :vy] + (* -10 (/ dt 1000)))
             (-> %
                 (assoc-in [:player :position :y] 2)
-                (assoc-in [:player :velocity :vy] 0)))))))
+                (assoc-in [:player :velocity :vy] 0)
+                (assoc-in [:player :flight :airborn] false)))))))
 
 (defn- load-textures []
   (reset! crate-texture
@@ -183,8 +205,10 @@
   (loop [last-time (get-time)
          game {:player (entity :player
                          (position :x 5 :y 2 :z 10)
+                         (volume :width 1 :height 2 :depth 1)
                          (orient :pitch 0 :yaw 0)
-                         (velocity :vy 0))
+                         (velocity :vy 0)
+                         (flight :airborn false))
                :entities [(entity :box
                             (position :x 5 :y 5 :z -5)
                             (volume :width 10 :height 10 :depth 10)

@@ -35,3 +35,6 @@
 
 (defcomponent render
   :fn #())
+
+(defcomponent flight
+  :airborn false)
