@@ -51,7 +51,8 @@
 
 (defn- draw-box [{{:keys [texture]} :texture :as box}]
   (set-color [1.0 1.0 1.0])
-  (.bind texture)
+  (when texture
+    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID texture)))
   (GL11/glPushMatrix)
   (GL11/glBegin GL11/GL_QUADS)
   (let [points (bounding-points box)
@@ -62,7 +63,8 @@
         (GL11/glTexCoord2f tx ty)
         (GL11/glVertex3f x y z))))
   (GL11/glEnd)
-  (GL11/glPopMatrix))
+  (GL11/glPopMatrix)
+  (GL11/glBindTexture GL11/GL_TEXTURE_2D 0))
 
 (defn- draw [{:keys [entities]}]
   (doseq [entity (filter :render entities)]
@@ -176,7 +178,7 @@
   (Mouse/setGrabbed true))
 
 (defn run []
-  (init-window 800 600)
+  (init-window 1024 768)
   (init-gl)
   (loop [last-time (get-time)
          game {:player (entity :player
@@ -186,6 +188,11 @@
                :entities [(entity :box
                             (position :x 5 :y 5 :z -5)
                             (volume :width 10 :height 10 :depth 10)
+                            (texture :texture @crate-texture)
+                            (render :fn draw-box))
+                          (entity :box2
+                            (position :x 0 :y 1 :z 2)
+                            (volume :width 2 :height 2 :depth 2)
                             (texture :texture @crate-texture)
                             (render :fn draw-box))]}]
     (if (Display/isCloseRequested)
