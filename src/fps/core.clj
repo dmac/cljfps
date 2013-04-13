@@ -9,7 +9,7 @@
   (:gen-class))
 
 (defrecord Game [camera entities])
-(defrecord Camera [x y z pitch yaw])
+(defrecord Camera [x y z pitch yaw vy])
 (defrecord Box [x y z width height depth texture])
 
 (def movement-speed 10) ; meters per second
@@ -98,7 +98,28 @@
         (update-in [:camera :pitch] #(mod (+ % (* dy mouse-sensitivity)) 360))
         (update-in [:camera :yaw] #(mod (+ % (* dx mouse-sensitivity)) 360)))))
 
-(defn- handle-keyboard-input [game dt]
+(defn- get-key-buffer []
+  (remove nil? (loop [k (Keyboard/next)
+                      buffer []]
+                 (if-not k
+                   buffer
+                   (if (Keyboard/getEventKeyState)
+                     (recur (Keyboard/next)
+                            (conj buffer (Keyboard/getEventKey)))
+                     (recur (Keyboard/next)
+                            buffer))))))
+
+(defn- handle-keyboard-input [game key-buffer]
+  (reduce
+    (fn [game k]
+      (cond
+        (and (= k Keyboard/KEY_SPACE)
+             (= 2 (get-in game [:camera :y]))) (assoc-in game [:camera :vy] 5)
+        :else game))
+    game
+    key-buffer))
+
+(defn- handle-constant-keyboard-input [game dt]
   (reduce
     (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
     game
@@ -106,6 +127,16 @@
      [Keyboard/KEY_D #(update-in % [:camera] move-right (distance-traveled dt))]
      [Keyboard/KEY_S #(update-in % [:camera] move-backward (distance-traveled dt))]
      [Keyboard/KEY_W #(update-in % [:camera] move-forward (distance-traveled dt))]]))
+
+(defn- tick [game dt]
+  (let [y-distance (-> dt (/ 1000) (* (get-in game [:camera :vy])))]
+    (-> game
+        (update-in [:camera :y] + y-distance)
+        (#(if (< 2 (get-in % [:camera :y]))
+            (update-in % [:camera :vy] + (* -10 (/ dt 1000)))
+            (-> %
+                (assoc-in [:camera :y] 2)
+                (assoc-in [:camera :vy] 0)))))))
 
 (defn- load-textures []
   (reset! crate-texture
@@ -143,7 +174,7 @@
   (init-gl)
   (loop [last-time (get-time)
          game (->Game
-                (->Camera 5 2 10 0 0)
+                (->Camera 5 2 10 0 0 0)
                 [(->Box 5 5 -5 10 10 10 @crate-texture)])]
     (if (Display/isCloseRequested)
       (System/exit 0)
@@ -151,7 +182,11 @@
       (do
         (let [new-time (get-time)
               dt (- new-time last-time)
-              new-game (-> game handle-mouse-input (handle-keyboard-input dt))]
+              new-game (-> game
+                           handle-mouse-input
+                           (handle-keyboard-input (get-key-buffer))
+                           (handle-constant-keyboard-input dt)
+                           (tick dt))]
           (clear-screen)
           (look-through (:camera game))
           (draw new-game)
