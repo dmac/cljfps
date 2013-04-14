@@ -1,5 +1,5 @@
 (ns fps.core
-  (:use [fps.component-entity :only [entity]]
+  (:use [fps.component-entity]
         [fps.textures :only [load-textures get-texture]])
   (:import [java.nio ByteBuffer ByteOrder]
            [org.lwjgl Sys]

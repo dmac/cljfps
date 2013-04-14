@@ -1,14 +1,11 @@
 (ns fps.component-entity)
 
+(defmacro entity [entity-name & components]
+  `(apply merge {:id ~entity-name} ~@components))
+
 (defmacro defcomponent [component-name & default-params]
   `(defn ~component-name [& params#]
-     (merge ~(apply hash-map default-params) (apply hash-map params#))))
-
-(defmacro entity [entity-name & components]
-  (apply merge {:id entity-name}
-         (map (fn [[component-name# & params#]]
-                {(keyword component-name#) (apply hash-map params#)})
-              components)))
+     {~(keyword component-name) (merge ~(apply hash-map default-params) (apply hash-map params#))}))
 
 (defcomponent position
   :x 0
