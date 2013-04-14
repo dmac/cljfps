@@ -56,9 +56,9 @@
                   {{x2 :x y2 :y z2 :z} :position {w2 :width h2 :height d2 :depth} :volume :as entity2}]
   {:pre [(and (:position entity1) (:volume entity1))
          (and (:position entity2) (:volume entity2))]}
-  (and (< (Math/abs (- x1 x2)) (+ (/ w1 2) (/ w2 2)))
-       (< (Math/abs (- y1 y2)) (+ (/ h1 2) (/ h2 2)))
-       (< (Math/abs (- z1 z2)) (+ (/ d1 2) (/ d2 2)))))
+  (and (<= (Math/abs (- x1 x2)) (+ (/ w1 2) (/ w2 2)))
+       (<= (Math/abs (- y1 y2)) (+ (/ h1 2) (/ h2 2)))
+       (<= (Math/abs (- z1 z2)) (+ (/ d1 2) (/ d2 2)))))
 
 (defn- draw-box [{{:keys [texture]} :texture :as box}]
   (set-color [1.0 1.0 1.0])
@@ -81,10 +81,12 @@
   (doseq [entity (filter :render entities)]
     ((get-in entity [:render :fn]) entity)))
 
-(defn- look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient}]
+(defn- look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient :as entity}]
+  {:pre [(and (:position entity) (:orient entity))]}
   (GL11/glRotatef pitch 1 0 0)
   (GL11/glRotatef yaw 0 1 0)
-  (GL11/glTranslatef (- x) (- y) (- z)))
+  ; The 0.8 adjustment increases the height of the camera "eyes" to near the top of the player entity.
+  (GL11/glTranslatef (- x) (- (+ y 0.8)) (- z)))
 
 (defn- move [entity direction distance collidables]
   {:pre [(and (:position entity) (:orient entity))
@@ -110,13 +112,13 @@
         entity)))
 
 (defn- move-vertical [entity distance collidables]
-  {:pre [(and (:position entity))]}
+  {:pre [(and (:position entity) (:velocity entity))]}
   (let [new-entity (update-in entity [:position :y] + distance)]
     (if (some (partial collides? new-entity) collidables)
       (-> entity
           (assoc-in [:velocity :vy] 0)
           (assoc-in [:flight :airborn] false))
-      new-entity)))
+      (assoc-in new-entity [:flight :airborn] true))))
 
 (defn- handle-mouse-input [game]
   (let [dx (Mouse/getDX)
@@ -141,9 +143,7 @@
     (fn [game k]
       (cond
         (and (= k Keyboard/KEY_SPACE)
-             (not (get-in game [:player :flight :airborn]))) (-> game
-                                                                 (assoc-in [:player :flight :airborn] true)
-                                                                 (assoc-in [:player :velocity :vy] 5))
+             (not (get-in game [:player :flight :airborn]))) (assoc-in game [:player :velocity :vy] 10)
         :else game))
     game
     key-buffer))
@@ -158,15 +158,14 @@
      [Keyboard/KEY_W #(update-in % [:player] move :forward (distance-traveled dt) (:entities game))]]))
 
 (defn- tick [game dt]
-  (let [y-distance (-> dt (/ 1000) (* (get-in game [:player :velocity :vy])))]
+  (let [acceleration -20
+        dt-seconds (/ dt 1000)
+        y-delta (+ (* dt-seconds (get-in game [:player :velocity :vy]))
+                   (* acceleration 0.5 dt-seconds dt-seconds))
+        vy-delta (* acceleration dt-seconds)]
     (-> game
-        (update-in [:player] move-vertical y-distance (:entities game))
-        (#(if (> (get-in % [:player :position :y]) 2)
-            (update-in % [:player :velocity :vy] + (* -10 (/ dt 1000)))
-            (-> %
-                (assoc-in [:player :position :y] 2)
-                (assoc-in [:player :velocity :vy] 0)
-                (assoc-in [:player :flight :airborn] false)))))))
+        (update-in [:player :velocity :vy] + vy-delta)
+        (update-in [:player] move-vertical y-delta (:entities game)))))
 
 (defn- load-textures []
   (reset! crate-texture
@@ -205,17 +204,40 @@
   (loop [last-time (get-time)
          game {:player (entity :player
                          (position :x 5 :y 2 :z 10)
-                         (volume :width 1 :height 2 :depth 1)
+                         (volume :width 1 :height 1.99 :depth 1)
                          (orient :pitch 0 :yaw 0)
                          (velocity :vy 0)
                          (flight :airborn false))
-               :entities [(entity :box
+               :entities [(entity :floor
+                            (position :x 0 :y 0 :z 0)
+                            (volume :width 100 :height 0 :depth 100))
+                          (entity :box
                             (position :x 5 :y 5 :z -5)
                             (volume :width 10 :height 10 :depth 10)
                             (texture :texture @crate-texture)
                             (render :fn draw-box))
                           (entity :box2
-                            (position :x 0 :y 1 :z 2)
+                            (position :x -1 :y 1 :z -1)
+                            (volume :width 2 :height 2 :depth 2)
+                            (texture :texture @crate-texture)
+                            (render :fn draw-box))
+                          (entity :box3
+                            (position :x -1 :y 3 :z -3)
+                            (volume :width 2 :height 2 :depth 2)
+                            (texture :texture @crate-texture)
+                            (render :fn draw-box))
+                          (entity :box4
+                            (position :x -1 :y 5 :z -5)
+                            (volume :width 2 :height 2 :depth 2)
+                            (texture :texture @crate-texture)
+                            (render :fn draw-box))
+                          (entity :box5
+                            (position :x -1 :y 7 :z -7)
+                            (volume :width 2 :height 2 :depth 2)
+                            (texture :texture @crate-texture)
+                            (render :fn draw-box))
+                          (entity :box6
+                            (position :x -1 :y 9 :z -9)
                             (volume :width 2 :height 2 :depth 2)
                             (texture :texture @crate-texture)
                             (render :fn draw-box))]}]
