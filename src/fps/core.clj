@@ -1,5 +1,6 @@
 (ns fps.core
-  (:use [fps.component-entity :only [entity]])
+  (:use [fps.component-entity :only [entity]]
+        [fps.textures :only [load-textures get-texture]])
   (:import [java.nio ByteBuffer ByteOrder]
            [org.lwjgl Sys]
            [org.lwjgl.opengl Display DisplayMode GL11]
@@ -14,8 +15,6 @@
 
 (def movement-speed 10) ; meters per second
 (def mouse-sensitivity 0.1)
-
-(def crate-texture (atom nil))
 
 (defn- find-first [pred coll]
   (first (filter pred coll)))
@@ -63,7 +62,7 @@
 (defn- draw-box [{{:keys [texture]} :texture :as box}]
   (set-color [1.0 1.0 1.0])
   (when texture
-    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID texture)))
+    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID (get-texture texture))))
   (GL11/glPushMatrix)
   (GL11/glBegin GL11/GL_QUADS)
   (let [points (bounding-points box)
@@ -176,10 +175,6 @@
         (update-in [:player :velocity :vy] + vy-delta)
         (update-in [:player] move-vertical y-delta (:entities game)))))
 
-(defn- load-textures []
-  (reset! crate-texture
-          (TextureLoader/getTexture "PNG" (ResourceLoader/getResourceAsStream "textures/crate.png"))))
-
 (defn- init-gl []
   (GL11/glMatrixMode GL11/GL_PROJECTION)
   (GL11/glLoadIdentity)
@@ -197,8 +192,7 @@
   ;(GL11/glColorMaterial GL11/GL_FRONT_AND_BACK GL11/GL_AMBIENT_AND_DIFFUSE)
   ;(GL11/glLight GL11/GL_LIGHT0 GL11/GL_POSITION (float-buffer 5 5 0 1))
   ;(GL11/glEnable GL11/GL_LIGHT0)
-  (load-textures)
-  )
+  (load-textures))
 
 (defn- init-window [w h]
   (Display/setDisplayMode (DisplayMode. w h))
@@ -223,32 +217,32 @@
                           (entity :box
                             (position :x 5 :y 5 :z -5)
                             (volume :width 10 :height 10 :depth 10)
-                            (texture :texture @crate-texture)
+                            (texture :texture :stone)
                             (render :fn draw-box))
                           (entity :box2
                             (position :x -1 :y 1 :z -1)
                             (volume :width 2 :height 2 :depth 2)
-                            (texture :texture @crate-texture)
+                            (texture :texture :crate)
                             (render :fn draw-box))
                           (entity :box3
                             (position :x -1 :y 3 :z -3)
                             (volume :width 2 :height 2 :depth 2)
-                            (texture :texture @crate-texture)
+                            (texture :texture :crate)
                             (render :fn draw-box))
                           (entity :box4
                             (position :x -1 :y 5 :z -5)
                             (volume :width 2 :height 2 :depth 2)
-                            (texture :texture @crate-texture)
+                            (texture :texture :crate)
                             (render :fn draw-box))
                           (entity :box5
                             (position :x -1 :y 7 :z -7)
                             (volume :width 2 :height 2 :depth 2)
-                            (texture :texture @crate-texture)
+                            (texture :texture :crate)
                             (render :fn draw-box))
                           (entity :box6
                             (position :x -1 :y 9 :z -9)
                             (volume :width 2 :height 2 :depth 2)
-                            (texture :texture @crate-texture)
+                            (texture :texture :crate)
                             (render :fn draw-box))]}]
     (if (Display/isCloseRequested)
       (System/exit 0)
