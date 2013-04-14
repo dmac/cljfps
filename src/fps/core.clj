@@ -32,7 +32,7 @@
 (defn- get-time []
   (-> (Sys/getTime) (/ (Sys/getTimerResolution)) (* 1000) double))
 
-(defn- distance-traveled [dt]
+(defn- distance-delta [dt]
   (-> dt (/ 1000) (* movement-speed)))
 
 (defn- set-color [[r g b]]
@@ -77,7 +77,7 @@
   (GL11/glBindTexture GL11/GL_TEXTURE_2D 0))
 
 (defn- draw [{:keys [entities]}]
-  (doseq [entity (filter :render entities)]
+  (doseq [entity (filter :render (vals entities))]
     ((get-in entity [:render :fn]) entity)))
 
 (defn- look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient :as entity}]
@@ -132,8 +132,8 @@
   (let [dx (Mouse/getDX)
         dy (- (Mouse/getDY))]
     (-> game
-        (update-in [:player :orient :pitch] #(mod (+ % (* dy mouse-sensitivity)) 360))
-        (update-in [:player :orient :yaw] #(mod (+ % (* dx mouse-sensitivity)) 360)))))
+        (update-in [:entities :player :orient :pitch] #(mod (+ % (* dy mouse-sensitivity)) 360))
+        (update-in [:entities :player :orient :yaw] #(mod (+ % (* dx mouse-sensitivity)) 360)))))
 
 (defn- get-key-buffer []
   (remove nil? (loop [k (Keyboard/next)
@@ -151,29 +151,32 @@
     (fn [game k]
       (cond
         (and (= k Keyboard/KEY_SPACE)
-             (not (get-in game [:player :flight :airborn]))) (assoc-in game [:player :velocity :vy] 10)
+             (not (get-in game [:entities :player :flight :airborn])))
+          (assoc-in game [:entities :player :velocity :vy] 10)
         :else game))
     game
     key-buffer))
 
 (defn- handle-constant-keyboard-input [game dt]
-  (reduce
-    (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
-    game
-    [[Keyboard/KEY_A #(update-in % [:player] move :left (distance-traveled dt) (:entities game))]
-     [Keyboard/KEY_D #(update-in % [:player] move :right (distance-traveled dt) (:entities game))]
-     [Keyboard/KEY_S #(update-in % [:player] move :backward (distance-traveled dt) (:entities game))]
-     [Keyboard/KEY_W #(update-in % [:player] move :forward (distance-traveled dt) (:entities game))]]))
+  (let [collidables (vals (dissoc (:entities game) :player))]
+    (reduce
+      (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
+      game
+      [[Keyboard/KEY_A #(update-in % [:entities :player] move :left (distance-delta dt) collidables)]
+       [Keyboard/KEY_D #(update-in % [:entities :player] move :right (distance-delta dt) collidables)]
+       [Keyboard/KEY_S #(update-in % [:entities :player] move :backward (distance-delta dt) collidables)]
+       [Keyboard/KEY_W #(update-in % [:entities :player] move :forward (distance-delta dt) collidables)]])))
 
 (defn- tick [game dt]
   (let [acceleration -20
         dt-seconds (/ dt 1000)
-        y-delta (+ (* dt-seconds (get-in game [:player :velocity :vy]))
+        y-delta (+ (* dt-seconds (get-in game [:entities :player :velocity :vy]))
                    (* acceleration 0.5 dt-seconds dt-seconds))
-        vy-delta (* acceleration dt-seconds)]
+        vy-delta (* acceleration dt-seconds)
+        collidables (vals (dissoc (:entities game) :player))]
     (-> game
-        (update-in [:player :velocity :vy] + vy-delta)
-        (update-in [:player] move-vertical y-delta (:entities game)))))
+        (update-in [:entities :player :velocity :vy] + vy-delta)
+        (update-in [:entities :player] move-vertical y-delta collidables))))
 
 (defn- init-gl []
   (GL11/glMatrixMode GL11/GL_PROJECTION)
@@ -205,45 +208,46 @@
   (init-window 1024 768)
   (init-gl)
   (loop [last-time (get-time)
-         game {:player (entity :player
-                         (position :x 5 :y 2 :z 10)
-                         (volume :width 1 :height 1.99 :depth 1)
-                         (orient :pitch 0 :yaw 0)
-                         (velocity :vy 0)
-                         (flight :airborn false))
-               :entities [(entity :floor
-                            (position :x 0 :y 0 :z 0)
-                            (volume :width 100 :height 0 :depth 100))
-                          (entity :box
-                            (position :x 5 :y 5 :z -5)
-                            (volume :width 10 :height 10 :depth 10)
-                            (texture :texture :stone)
-                            (render :fn draw-box))
-                          (entity :box2
-                            (position :x -1 :y 1 :z -1)
-                            (volume :width 2 :height 2 :depth 2)
-                            (texture :texture :crate)
-                            (render :fn draw-box))
-                          (entity :box3
-                            (position :x -1 :y 3 :z -3)
-                            (volume :width 2 :height 2 :depth 2)
-                            (texture :texture :crate)
-                            (render :fn draw-box))
-                          (entity :box4
-                            (position :x -1 :y 5 :z -5)
-                            (volume :width 2 :height 2 :depth 2)
-                            (texture :texture :crate)
-                            (render :fn draw-box))
-                          (entity :box5
-                            (position :x -1 :y 7 :z -7)
-                            (volume :width 2 :height 2 :depth 2)
-                            (texture :texture :crate)
-                            (render :fn draw-box))
-                          (entity :box6
-                            (position :x -1 :y 9 :z -9)
-                            (volume :width 2 :height 2 :depth 2)
-                            (texture :texture :crate)
-                            (render :fn draw-box))]}]
+         game {:entities (into {} (map (fn [entity] [(:id entity) entity])
+                                       [(entity :player
+                                          (position :x 5 :y 2 :z 10)
+                                          (volume :width 1 :height 1.99 :depth 1)
+                                          (orient :pitch 0 :yaw 0)
+                                          (velocity :vy 0)
+                                          (flight :airborn false))
+                                        (entity :floor
+                                          (position :x 0 :y 0 :z 0)
+                                          (volume :width 100 :height 0 :depth 100))
+                                        (entity :box
+                                          (position :x 5 :y 5 :z -5)
+                                          (volume :width 10 :height 10 :depth 10)
+                                          (texture :texture :stone)
+                                          (render :fn draw-box))
+                                        (entity :box2
+                                          (position :x -1 :y 1 :z -1)
+                                          (volume :width 2 :height 2 :depth 2)
+                                          (texture :texture :crate)
+                                          (render :fn draw-box))
+                                        (entity :box3
+                                          (position :x -1 :y 3 :z -3)
+                                          (volume :width 2 :height 2 :depth 2)
+                                          (texture :texture :crate)
+                                          (render :fn draw-box))
+                                        (entity :box4
+                                          (position :x -1 :y 5 :z -5)
+                                          (volume :width 2 :height 2 :depth 2)
+                                          (texture :texture :crate)
+                                          (render :fn draw-box))
+                                        (entity :box5
+                                          (position :x -1 :y 7 :z -7)
+                                          (volume :width 2 :height 2 :depth 2)
+                                          (texture :texture :crate)
+                                          (render :fn draw-box))
+                                        (entity :box6
+                                          (position :x -1 :y 9 :z -9)
+                                          (volume :width 2 :height 2 :depth 2)
+                                          (texture :texture :crate)
+                                          (render :fn draw-box))]))}]
     (if (Display/isCloseRequested)
       (System/exit 0)
       ;(Display/destroy)
@@ -256,7 +260,7 @@
                            (handle-constant-keyboard-input dt)
                            (tick dt))]
           (clear-screen)
-          (look-through (:player game))
+          (look-through (get-in game [:entities :player]))
           (draw new-game)
           (Display/update)
           (Display/sync 60)
