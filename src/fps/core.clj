@@ -114,10 +114,19 @@
 (defn- move-vertical [entity distance collidables]
   {:pre [(and (:position entity) (:velocity entity))]}
   (let [new-entity (update-in entity [:position :y] + distance)]
-    (if (some (partial collides? new-entity) collidables)
-      (-> entity
-          (assoc-in [:velocity :vy] 0)
-          (assoc-in [:flight :airborn] false))
+    (if-let [collided-entity (find-first (partial collides? new-entity) collidables)]
+      ; If a collision happens, entity's y value is set the boundary of the collided entity.
+      ; This code should probably be decomposed and shared with the other move function.
+      (let [collided-y (get-in collided-entity [:position :y])
+            collided-hh (/ (get-in collided-entity [:volume :height]) 2)
+            entity-hh (/ (get-in entity [:volume :height]) 2)
+            resting-y (if (< 0 distance)
+                        (- collided-y collided-hh entity-hh)
+                        (+ collided-y collided-hh entity-hh))]
+        (-> entity
+            (assoc-in [:velocity :vy] 0)
+            (assoc-in [:position :y] (Math/nextAfter resting-y Double/MAX_VALUE))
+            (assoc-in [:flight :airborn] false)))
       (assoc-in new-entity [:flight :airborn] true))))
 
 (defn- handle-mouse-input [game]
