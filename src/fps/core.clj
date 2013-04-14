@@ -124,7 +124,7 @@
                         (+ collided-y collided-hh entity-hh))]
         (-> entity
             (assoc-in [:velocity :vy] 0)
-            (assoc-in [:position :y] (Math/nextAfter resting-y Double/MAX_VALUE))
+            (assoc-in [:position :y] (Math/nextAfter (double resting-y) Double/MAX_VALUE))
             (assoc-in [:flight :airborn] false)))
       (assoc-in new-entity [:flight :airborn] true))))
 
@@ -167,16 +167,26 @@
        [Keyboard/KEY_S #(update-in % [:entities :player] move :backward (distance-delta dt) collidables)]
        [Keyboard/KEY_W #(update-in % [:entities :player] move :forward (distance-delta dt) collidables)]])))
 
+(defn- update-flight [game dt]
+  (reduce
+    (fn [game entity-index]
+      (let [acceleration -20
+            dt-seconds (/ dt 1000)
+            y-delta (+ (* dt-seconds (get-in game (concat entity-index [:velocity :vy])))
+                       (* acceleration 0.5 dt-seconds dt-seconds))
+            vy-delta (* acceleration dt-seconds)
+            collidables (vals (dissoc (:entities game) (last entity-index)))]
+        (-> game
+            (update-in (concat entity-index [:velocity :vy]) + vy-delta)
+            (update-in entity-index move-vertical y-delta collidables))))
+    game
+    (for [entity-id (keys (:entities game))
+          :let [entity (get-in game [:entities entity-id])]
+          :when (and (:flight entity) (:velocity entity))]
+      [:entities entity-id])))
+
 (defn- tick [game dt]
-  (let [acceleration -20
-        dt-seconds (/ dt 1000)
-        y-delta (+ (* dt-seconds (get-in game [:entities :player :velocity :vy]))
-                   (* acceleration 0.5 dt-seconds dt-seconds))
-        vy-delta (* acceleration dt-seconds)
-        collidables (vals (dissoc (:entities game) :player))]
-    (-> game
-        (update-in [:entities :player :velocity :vy] + vy-delta)
-        (update-in [:entities :player] move-vertical y-delta collidables))))
+  (update-flight game dt))
 
 (defn- init-gl []
   (GL11/glMatrixMode GL11/GL_PROJECTION)
