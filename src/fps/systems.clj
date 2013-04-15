@@ -9,6 +9,15 @@
        (<= (Math/abs (- y1 y2)) (+ (/ h1 2) (/ h2 2)))
        (<= (Math/abs (- z1 z2)) (+ (/ d1 2) (/ d2 2)))))
 
+(defn bounding-points [{{:keys [x y z]} :position
+                         {:keys [width height depth]} :volume :as entity}]
+  {:pre [(and (:position entity) (:volume entity))]}
+  (let [hw (/ width 2) hh (/ height 2) hd (/ depth 2)]
+    [[(- x hw) (- y hh) (+ z hd)] [(- x hw) (+ y hh) (+ z hd)]
+     [(+ x hw) (+ y hh) (+ z hd)] [(+ x hw) (- y hh) (+ z hd)]
+     [(- x hw) (- y hh) (- z hd)] [(- x hw) (+ y hh) (- z hd)]
+     [(+ x hw) (+ y hh) (- z hd)] [(+ x hw) (- y hh) (- z hd)]]))
+
 (defn move [entity direction distance collidables]
   {:pre [(and (:position entity) (:orient entity))
          (contains? #{:forward :backward :left :right} direction)]}

@@ -1,5 +1,6 @@
 (ns fps.graphics
-  (:require [fps.textures :as textures])
+  (:require [fps.textures :as textures]
+            [fps.systems :as systems])
   (:use [fps.textures :only [get-texture]]
         [fps.utils :only [select-indices]])
   (:import [org.lwjgl.opengl Display DisplayMode GL11]
@@ -13,22 +14,13 @@
 (defn- set-color [[r g b]]
   (GL11/glColor3f r g b))
 
-(defn- bounding-points [{{:keys [x y z]} :position
-                         {:keys [width height depth]} :volume :as entity}]
-  {:pre [(and (:position entity) (:volume entity))]}
-  (let [hw (/ width 2) hh (/ height 2) hd (/ depth 2)]
-    [[(- x hw) (- y hh) (+ z hd)] [(- x hw) (+ y hh) (+ z hd)]
-     [(+ x hw) (+ y hh) (+ z hd)] [(+ x hw) (- y hh) (+ z hd)]
-     [(- x hw) (- y hh) (- z hd)] [(- x hw) (+ y hh) (- z hd)]
-     [(+ x hw) (+ y hh) (- z hd)] [(+ x hw) (- y hh) (- z hd)]]))
-
 (defn draw-box [{{:keys [texture]} :texture :as box}]
   (set-color [1.0 1.0 1.0])
   (when texture
     (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID (get-texture texture))))
   (GL11/glPushMatrix)
   (GL11/glBegin GL11/GL_QUADS)
-  (let [points (bounding-points box)
+  (let [points (systems/bounding-points box)
         texture-points [[0 0] [0 1] [1 1] [1 0]]]
     (doseq [point-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]]
       (doseq [[[tx ty] [x y z]] (partition 2 (interleave texture-points
