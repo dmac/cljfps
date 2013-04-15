@@ -1,4 +1,4 @@
-(ns fps.util
+(ns fps.utils
   (:import [java.nio ByteBuffer ByteOrder]))
 
 (defn float-buffer [& args]

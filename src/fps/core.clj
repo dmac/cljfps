@@ -4,7 +4,7 @@
             [fps.systems :as systems])
   (:use fps.component-entity
         [fps.levels :only [load-level]]
-        [fps.util :only [find-first float-buffer]])
+        [fps.utils :only [find-first float-buffer]])
   (:import [org.lwjgl Sys]
            [org.lwjgl.opengl Display DisplayMode]
            [org.lwjgl.input Keyboard Mouse])

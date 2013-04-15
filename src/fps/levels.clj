@@ -3,7 +3,7 @@
             [fps.graphics :as graphics])
   (:use [clojure.java.io :only [resource]]
         [fps.component-entity]
-        [fps.util :only [indexed]]))
+        [fps.utils :only [indexed]]))
 
 (def ^:private current-id (atom 0))
 

@@ -1,5 +1,5 @@
 (ns fps.systems
-  (:use [fps.util :only [find-first]]))
+  (:use [fps.utils :only [find-first]]))
 
 (defn- collides? [{{x1 :x y1 :y z1 :z} :position {w1 :width h1 :height d1 :depth} :volume :as entity1}
                   {{x2 :x y2 :y z2 :z} :position {w2 :width h2 :height d2 :depth} :volume :as entity2}]

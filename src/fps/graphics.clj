@@ -1,7 +1,7 @@
 (ns fps.graphics
   (:require [fps.textures :as textures])
   (:use [fps.textures :only [get-texture]]
-        [fps.util :only [select-indices]])
+        [fps.utils :only [select-indices]])
   (:import [org.lwjgl.opengl Display DisplayMode GL11]
            [org.lwjgl.util.glu GLU]
            [org.lwjgl.input Mouse]))
