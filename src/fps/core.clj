@@ -3,11 +3,9 @@
             [fps.controls :as controls]
             [fps.systems :as systems])
   (:use fps.component-entity
-        [fps.levels :only [load-level]]
-        [fps.utils :only [find-first float-buffer]])
+        [fps.levels :only [load-level]])
   (:import [org.lwjgl Sys]
-           [org.lwjgl.opengl Display DisplayMode]
-           [org.lwjgl.input Keyboard Mouse])
+           [org.lwjgl.opengl Display])
   (:gen-class))
 
 (defn- get-time []
@@ -44,8 +42,7 @@
               dt (- new-time last-time)
               new-game (-> game
                            controls/handle-mouse-input
-                           (controls/handle-keyboard-input (controls/get-key-buffer))
-                           (controls/handle-constant-keyboard-input dt)
+                           (controls/handle-keyboard-input dt)
                            (update-all dt))]
           (graphics/clear-screen)
           (graphics/look-through (get-in game [:entities :player]))
