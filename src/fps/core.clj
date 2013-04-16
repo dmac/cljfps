@@ -11,6 +11,17 @@
 (defn- get-time []
   (-> (Sys/getTime) (/ (Sys/getTimerResolution)) (* 1000) double))
 
+(def ^:private fps (atom 0))
+(def ^:private last-fps (atom (get-time)))
+
+(defn- update-fps []
+  (swap! fps inc)
+  (let [new-time (get-time)]
+    (when (> (- new-time @last-fps) 1000)
+      (Display/setTitle (str "FPS: " @fps))
+      (reset! fps 0)
+      (reset! last-fps new-time))))
+
 (defn- render-all [{:keys [entities]}]
   (doseq [entity (filter :render (vals entities))]
     ((get-in entity [:render :fn]) entity)))
@@ -49,6 +60,7 @@
           (render-all new-game)
           (Display/update)
           (Display/sync 60)
+          (update-fps)
           (recur new-time new-game))))))
 
 (defn -main []
