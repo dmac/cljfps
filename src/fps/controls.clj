@@ -27,6 +27,9 @@
         (and (= k Keyboard/KEY_SPACE)
              (not (get-in game [:entities :player :flight :airborn])))
           (assoc-in game [:entities :player :velocity :vy] 10)
+        (= k Keyboard/KEY_ESCAPE) (-> game
+                                      (assoc-in [:entities :player :position] {:x 0 :y 2 :z 0})
+                                      (assoc-in [:entities :player :velocity :vy] 0))
         :else game))
     game
     key-buffer))

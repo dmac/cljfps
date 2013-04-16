@@ -25,9 +25,9 @@
          game {:entities (into {} (map (fn [entity] [(:id entity) entity])
                                        (concat
                                          [(entity :player
-                                            (position :x 5 :y 2 :z 10)
+                                            (position :x 0 :y 2 :z 0)
                                             (volume :width 0.5 :height 1.9 :depth 0.5)
-                                            (orient :pitch 0 :yaw 0)
+                                            (orient :pitch 0 :yaw 180)
                                             (velocity :vy 0)
                                             (flight :airborn false))
                                           (entity :floor
