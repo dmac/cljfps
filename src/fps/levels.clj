@@ -26,15 +26,15 @@
             (for [[y-index slice] (indexed slices)
                   [z-index row] (indexed (string/split slice #"\n"))
                   [x-index c] (indexed (seq row))
-                  :let [texture-type (case c
-                                       \S :stone
-                                       \C :crate
-                                       nil)
+                  :let [material-type (case c
+                                        \S :stone
+                                        \C :crate
+                                        nil)
                         block-size 1
                         hbs (/ block-size 2.0)]]
-              (when texture-type
+              (when material-type
                 (entity (next-id)
                   (position :x (+ x-index hbs) :y (+ y-index hbs) :z (+ z-index hbs))
                   (volume :width block-size :height block-size :depth block-size)
-                  (texture :texture texture-type)
+                  (material :material material-type)
                   (render :fn graphics/draw-box)))))))

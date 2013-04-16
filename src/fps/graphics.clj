@@ -17,10 +17,10 @@
 (defn- set-color [[r g b]]
   (GL11/glColor3f r g b))
 
-(defn draw-box [{{:keys [texture]} :texture :as box}]
+(defn draw-box [{{:keys [material]} :material :as box}]
   (set-color [1.0 1.0 1.0])
-  (when texture
-    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID (get-texture texture))))
+  (when material
+    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID (get-texture material))))
   (GL11/glPushMatrix)
   (GL11/glBegin GL11/GL_QUADS)
   (let [points (systems/bounding-points box)

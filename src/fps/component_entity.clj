@@ -27,8 +27,8 @@
   :height 0
   :depth 0)
 
-(defcomponent texture
-  :texture nil)
+(defcomponent material
+  :material nil)
 
 (defcomponent render
   :fn #())
