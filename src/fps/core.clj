@@ -19,7 +19,7 @@
   (systems/update-flight game dt))
 
 (defn run []
-  (graphics/init-window 1024 768)
+  (graphics/init-window)
   (graphics/init-gl)
   (loop [last-time (get-time)
          game {:entities (into {} (map (fn [entity] [(:id entity) entity])

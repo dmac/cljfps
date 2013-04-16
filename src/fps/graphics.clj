@@ -7,6 +7,9 @@
            [org.lwjgl.util.glu GLU]
            [org.lwjgl.input Mouse]))
 
+(def ^:private window-width 1024)
+(def ^:private window-height 768)
+
 (defn clear-screen []
   (GL11/glClear (bit-or GL11/GL_COLOR_BUFFER_BIT GL11/GL_DEPTH_BUFFER_BIT))
   (GL11/glLoadIdentity))
@@ -38,8 +41,8 @@
   ; The 0.8 adjustment increases the height of the camera "eyes" to near the top of the player entity.
   (GL11/glTranslatef (- x) (- (+ y 0.8)) (- z)))
 
-(defn init-window [w h]
-  (Display/setDisplayMode (DisplayMode. w h))
+(defn init-window []
+  (Display/setDisplayMode (DisplayMode. window-width window-height))
   (Display/setTitle "FPS")
   (Display/setVSyncEnabled true)
   (Display/create)
@@ -48,7 +51,7 @@
 (defn init-gl []
   (GL11/glMatrixMode GL11/GL_PROJECTION)
   (GL11/glLoadIdentity)
-  (GLU/gluPerspective 70.0 (/ 800 600) 0.1 1000)
+  (GLU/gluPerspective 70.0 (/ window-width window-height) 0.1 1000)
   (GL11/glMatrixMode GL11/GL_MODELVIEW)
   (GL11/glClearColor 0 0 0 0)
   (GL11/glClearDepth 1)
