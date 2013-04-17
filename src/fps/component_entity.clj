@@ -1,11 +1,23 @@
 (ns fps.component-entity)
 
 (defmacro entity [entity-name & components]
-  `(apply merge {:id ~entity-name} ~@components))
+  `(reduce add-component {:id ~entity-name} ~(vec components)))
 
 (defmacro defcomponent [component-name & default-params]
   `(defn ~component-name [& params#]
-     {~(keyword component-name) (merge ~(apply hash-map default-params) (apply hash-map params#))}))
+     (let [spec# (merge ~(apply hash-map default-params) (apply hash-map params#))
+           init-fn# (get spec# :init-fn)
+           attributes# (dissoc spec# :init-fn)]
+       (with-meta {:id ~(keyword component-name) :attributes attributes#}
+                  {:init-fn init-fn#}))))
+
+(defn add-component [entity component]
+  (let [metadata (meta component)]
+    (-> entity
+        (assoc (:id component) (with-meta (:attributes component) metadata))
+        (#(if (fn? (:init-fn metadata))
+            ((:init-fn metadata) %)
+            %)))))
 
 (defcomponent position
   :x 0
