@@ -27,10 +27,10 @@
   (let [points (systems/bounding-points box)
         face-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]
         vertex-data (->> face-indices
-                      (map (fn [corner-indices] (select-indices points corner-indices)))
-                      (apply concat)
-                      (apply concat)
-                      (apply float-buffer))]
+                         (map (fn [corner-indices] (select-indices points corner-indices)))
+                         (apply concat)
+                         (apply concat)
+                         (apply float-buffer))]
     (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER (get-in box [:render :vertex-buffer-id]))
     (GL15/glBufferData GL15/GL_ARRAY_BUFFER vertex-data GL15/GL_STATIC_DRAW)
     box))

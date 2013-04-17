@@ -10,7 +10,7 @@
        (<= (Math/abs (- z1 z2)) (+ (/ d1 2) (/ d2 2)))))
 
 (defn bounding-points [{{:keys [x y z]} :position
-                         {:keys [width height depth]} :volume :as entity}]
+                        {:keys [width height depth]} :volume :as entity}]
   {:pre [(and (:position entity) (:volume entity))]}
   (let [hw (/ width 2) hh (/ height 2) hd (/ depth 2)]
     [[(- x hw) (- y hh) (+ z hd)] [(- x hw) (+ y hh) (+ z hd)]
