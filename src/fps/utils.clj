@@ -1,11 +1,10 @@
 (ns fps.utils
-  (:import [java.nio ByteBuffer ByteOrder]))
+  (:import [org.lwjgl BufferUtils]))
 
 (defn float-buffer [& args]
-  (-> (doto (ByteBuffer/allocateDirect 16) (.order (ByteOrder/nativeOrder)))
-      .clear .asFloatBuffer
+  (-> (BufferUtils/createFloatBuffer (count args))
       (.put (float-array args))
-      .flip))
+      (.flip)))
 
 (defn find-first [pred coll]
   (first (filter pred coll)))
