@@ -21,7 +21,11 @@
 
                                    num-repeats (Integer/parseInt metadata)]
                                (repeat num-repeats slice)))
-                           slices-with-metadata))]
+                           slices-with-metadata))
+        box-init-fn (fn [box]
+                      (-> box
+                          (assoc-in [:render :vertex-buffer-id] (graphics/init-vertex-buffer))
+                          graphics/regenerate-box-vertex-data!))]
     (filter (comp not nil?)
             (for [[y-index slice] (indexed slices)
                   [z-index row] (indexed (string/split slice #"\n"))
@@ -37,4 +41,5 @@
                   (position :x (+ x-index hbs) :y (+ y-index hbs) :z (+ z-index hbs))
                   (volume :width block-size :height block-size :depth block-size)
                   (material :material material-type)
-                  (render :fn graphics/draw-box)))))))
+                  (render :fn graphics/draw-box
+                          :init-fn box-init-fn)))))))

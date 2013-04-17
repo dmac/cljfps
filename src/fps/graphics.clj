@@ -2,13 +2,19 @@
   (:require [fps.textures :as textures]
             [fps.systems :as systems])
   (:use [fps.textures :only [get-texture]]
-        [fps.utils :only [select-indices]])
-  (:import [org.lwjgl.opengl Display DisplayMode GL11]
+        [fps.utils :only [select-indices float-buffer]])
+  (:import [org.lwjgl.opengl Display DisplayMode GL11 GL15]
+           [org.lwjgl BufferUtils]
            [org.lwjgl.util.glu GLU]
            [org.lwjgl.input Mouse]))
 
 (def ^:private window-width 1024)
 (def ^:private window-height 768)
+
+(defn init-vertex-buffer []
+  (let [int-buffer (BufferUtils/createIntBuffer 1)]
+    (GL15/glGenBuffers int-buffer)
+    (.get int-buffer 0)))
 
 (defn clear-screen []
   (GL11/glClear (bit-or GL11/GL_COLOR_BUFFER_BIT GL11/GL_DEPTH_BUFFER_BIT))
@@ -17,22 +23,28 @@
 (defn- set-color [[r g b]]
   (GL11/glColor3f r g b))
 
-(defn draw-box [{{:keys [material]} :material :as box}]
-  (set-color [1.0 1.0 1.0])
-  (when material
-    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID (get-texture material))))
-  (GL11/glPushMatrix)
-  (GL11/glBegin GL11/GL_QUADS)
+(defn regenerate-box-vertex-data! [box]
   (let [points (systems/bounding-points box)
-        texture-points [[0 0] [0 1] [1 1] [1 0]]]
-    (doseq [point-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]]
-      (doseq [[[tx ty] [x y z]] (partition 2 (interleave texture-points
-                                                         (select-indices points point-indices)))]
-        (GL11/glTexCoord2f tx ty)
-        (GL11/glVertex3f x y z))))
-  (GL11/glEnd)
-  (GL11/glPopMatrix)
-  (GL11/glBindTexture GL11/GL_TEXTURE_2D 0))
+        face-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]
+        vertex-data (->> face-indices
+                      (map (fn [corner-indices] (select-indices points corner-indices)))
+                      (apply concat)
+                      (apply concat)
+                      (apply float-buffer))]
+    (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER (get-in box [:render :vertex-buffer-id]))
+    (GL15/glBufferData GL15/GL_ARRAY_BUFFER vertex-data GL15/GL_STATIC_DRAW)
+    box))
+
+(defn draw-box [box]
+  ; Consider having each face be its own VBO and only draw visible ones
+  (let [vertex-size 3
+        num-vertices 24]
+    (set-color [1.0 1.0 1.0])
+    (GL11/glPushMatrix)
+    (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER (get-in box [:render :vertex-buffer-id]))
+    (GL11/glVertexPointer vertex-size GL11/GL_FLOAT 12 0)
+    (GL11/glDrawArrays GL11/GL_QUADS 0 num-vertices)
+    (GL11/glPopMatrix)))
 
 (defn look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient :as entity}]
   {:pre [(and (:position entity) (:orient entity))]}
@@ -59,6 +71,7 @@
   (GL11/glDepthFunc GL11/GL_LEQUAL)
   (GL11/glHint GL11/GL_PERSPECTIVE_CORRECTION_HINT GL11/GL_NICEST)
   (GL11/glEnable GL11/GL_TEXTURE_2D)
+  (GL11/glEnableClientState GL11/GL_VERTEX_ARRAY)
   ;; Lighting
   ;(GL11/glEnable GL11/GL_LIGHTING)
   ;(GL11/glEnable GL11/GL_COLOR_MATERIAL)
