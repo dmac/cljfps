@@ -34,6 +34,7 @@
     (GL15/glBufferData GL15/GL_ARRAY_BUFFER vertex-data GL15/GL_STATIC_DRAW)
     box))
 
+; TODO: glDrawArrays is a bottleneck. Rendering in chunks should improve performance.
 (defn draw-box [box]
   ; [x y z tx ty]
   (let [sizeof-float 4

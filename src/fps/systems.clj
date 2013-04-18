@@ -37,6 +37,7 @@
         new-entity-x (update-in entity [:position :x] update-x-fn update-x-amount)
         new-entity-z (update-in entity [:position :z] update-z-fn update-z-amount)
         new-entity-xz (assoc-in new-entity-x [:position :z] (get-in new-entity-z [:position :z]))]
+    ; TODO: This is a performance bottleneck.
     (or (find-first #(not-any? (partial collides? %) collidables)
                     [new-entity-xz new-entity-x new-entity-z])
         entity)))
