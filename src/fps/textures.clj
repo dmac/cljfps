@@ -5,7 +5,7 @@
            [org.newdawn.slick.opengl TextureLoader]
            [org.newdawn.slick.util ResourceLoader]))
 
-(def ^:private texture-map (atom {}))
+(def ^:private texture-id-map (atom {}))
 
 (defn- load-texture [filename]
   (TextureLoader/getTexture "PNG" (ResourceLoader/getResourceAsStream filename)))
@@ -15,7 +15,7 @@
     (doseq [texture-file texture-files]
       (let [texture-key (-> texture-file (string/split #"\.") first keyword)
             texture (load-texture (str "textures/" texture-file))]
-        (swap! texture-map assoc texture-key texture)))))
+        (swap! texture-id-map assoc texture-key (.getTextureID texture))))))
 
-(defn get-texture [texture-key]
-  (texture-key @texture-map))
+(defn get-texture-id [texture-key]
+  (texture-key @texture-id-map))

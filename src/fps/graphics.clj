@@ -1,8 +1,7 @@
 (ns fps.graphics
   (:require [fps.textures :as textures]
             [fps.systems :as systems])
-  (:use [fps.textures :only [get-texture]]
-        [fps.utils :only [select-indices float-buffer]])
+  (:use [fps.utils :only [select-indices float-buffer]])
   (:import [org.lwjgl.opengl Display DisplayMode GL11 GL15]
            [org.lwjgl BufferUtils]
            [org.lwjgl.util.glu GLU]
@@ -46,13 +45,11 @@
         num-vertices 24]
     ; Consider having each face be its own VBO and only draw visible ones
     (GL11/glPushMatrix)
-    ; TODO: This line drops FPS from 60 to 30. Profile with warn-on-reflection.
-    (GL11/glBindTexture GL11/GL_TEXTURE_2D (.getTextureID (get-texture (get-in box [:material :material]))))
+    (GL11/glBindTexture GL11/GL_TEXTURE_2D (textures/get-texture-id (get-in box [:material :material])))
     (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER (get-in box [:render :vertex-buffer-id]))
     (GL11/glVertexPointer vertex-size GL11/GL_FLOAT stride vertex-offset)
     (GL11/glTexCoordPointer texture-size GL11/GL_FLOAT stride texture-offset)
     (GL11/glDrawArrays GL11/GL_QUADS 0 num-vertices)
-    ;(GL11/glBindTexture GL11/GL_TEXTURE_2D 0)
     (GL11/glPopMatrix)))
 
 (defn look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient :as entity}]
