@@ -44,7 +44,7 @@
                                           (entity :floor
                                             (position :x 0 :y 0 :z 0)
                                             (volume :width 100 :height 0 :depth 100))]
-                                         (load-level "room.dat"))))}]
+                                         (load-level "flat.dat"))))}]
     (if (Display/isCloseRequested)
       (System/exit 0)
       ;(Display/destroy)
