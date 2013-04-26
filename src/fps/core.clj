@@ -22,8 +22,10 @@
       (reset! fps 0)
       (reset! last-fps new-time))))
 
-(defn- render-all [{:keys [entities]}]
+(defn- render-all [{:keys [entities world]}]
   (doseq [entity (filter :render (vals entities))]
+    ((get-in entity [:render :fn]) entity))
+  (doseq [entity (->> world (apply concat) (apply concat) (filter :render))]
     ((get-in entity [:render :fn]) entity)))
 
 (defn- update-all [game dt]
@@ -34,17 +36,16 @@
   (graphics/init-gl)
   (loop [last-time (get-time)
          game {:entities (into {} (map (fn [entity] [(:id entity) entity])
-                                       (concat
-                                         [(entity :player
-                                            (position :x 0 :y 2 :z 0)
-                                            (volume :width 0.5 :height 1.9 :depth 0.5)
-                                            (orient :pitch 0 :yaw 180)
-                                            (velocity :vy 0)
-                                            (flight :airborn false))
-                                          (entity :floor
-                                            (position :x 0 :y 0 :z 0)
-                                            (volume :width 100 :height 0 :depth 100))]
-                                         (load-level "flat.dat"))))}]
+                                       [(entity :player
+                                          (position :x 0 :y 20 :z 0)
+                                          (volume :width 0.5 :height 1.9 :depth 0.5)
+                                          (orient :pitch 0 :yaw 180)
+                                          (velocity :vy 0)
+                                          #_(flight :airborn false))
+                                        (entity :floor
+                                          (position :x 0 :y 0 :z 0)
+                                          (volume :width 100 :height 0 :depth 100))]))
+               :world (load-level "flat.dat")}]
     (if (Display/isCloseRequested)
       (System/exit 0)
       ;(Display/destroy)

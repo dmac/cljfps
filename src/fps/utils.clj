@@ -15,3 +15,8 @@
 (defn select-indices [coll indices]
   (let [selected-map (select-keys coll indices)]
     (into [] (map #(get selected-map %) indices))))
+
+(defn vassoc-in [m [k & ks] v]
+  (if ks
+    (assoc m k (vassoc-in (get m k []) ks v))
+    (assoc m k v)))

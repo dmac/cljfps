@@ -3,7 +3,7 @@
             [fps.graphics :as graphics])
   (:use [clojure.java.io :only [resource]]
         [fps.component-entity]
-        [fps.utils :only [indexed]]))
+        [fps.utils :only [indexed vassoc-in]]))
 
 (def ^:private current-id (atom 0))
 
@@ -26,20 +26,23 @@
                       (-> box
                           (assoc-in [:render :vertex-buffer-id] (graphics/init-vertex-buffer))
                           graphics/regenerate-box-vertex-data!))]
-    (filter (comp not nil?)
-            (for [[y-index slice] (indexed slices)
-                  [z-index row] (indexed (string/split slice #"\n"))
-                  [x-index c] (indexed (seq row))
+    (reduce (fn [world [x y z box]]
+              (vassoc-in world [x y z] box))
+            []
+            (for [[y slice] (indexed slices)
+                  [z row] (indexed (string/split slice #"\n"))
+                  [x c] (indexed (seq row))
                   :let [material-type (case c
                                         \S :stone
                                         \C :crate
                                         nil)
                         block-size 1
                         hbs (/ block-size 2.0)]]
-              (when material-type
-                (entity (next-id)
-                  (position :x (+ x-index hbs) :y (+ y-index hbs) :z (+ z-index hbs))
-                  (volume :width block-size :height block-size :depth block-size)
-                  (material :material material-type)
-                  (render :fn graphics/draw-box
-                          :init-fn box-init-fn)))))))
+              [x y z
+               (when material-type
+                 (entity (next-id)
+                   (position :x (+ x hbs) :y (+ y hbs) :z (+ z hbs))
+                   (volume :width block-size :height block-size :depth block-size)
+                   (material :material material-type)
+                   (render :fn graphics/draw-box
+                           :init-fn box-init-fn)))]))))
