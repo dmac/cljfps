@@ -20,3 +20,10 @@
   (if ks
     (assoc m k (vassoc-in (get m k []) ks v))
     (assoc m k v)))
+
+(defn safe-subvec [v start end]
+  (let [len (count v)]
+    (cond
+      (< end 0) []
+      (> start len) []
+      :else (subvec v (max start 0) (min end len)))))

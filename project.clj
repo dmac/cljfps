@@ -8,5 +8,7 @@
                  [org.lwjgl.lwjgl/lwjgl_util "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl-platform "2.8.5" :classifier "natives-osx" :native-prefix ""]
                  [slick-util "1.0.0"]]
+  :profiles {:dev {:dependencies [[midje "1.5.1"]]
+                   :plugins [[lein-midje "3.0.1"]]}}
   :jvm-opts ["-Djava.library.path=target/native"]
   :main fps.core)

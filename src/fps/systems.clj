@@ -1,8 +1,19 @@
 (ns fps.systems
-  (:use [fps.utils :only [find-first]]))
+  (:use [fps.utils :only [find-first safe-subvec]]))
 
 (defn world-blocks [game]
   (->> game :world (apply concat) (apply concat) (remove nil?)))
+
+(defn nearby-blocks [{{:keys [x y z]} :position :as entity} game radius]
+  {:pre [(:position entity)]}
+  (let [get-min-max (juxt #(- % radius) #(+ % radius 1))
+        [min-x max-x] (get-min-max x)
+        [min-y max-y] (get-min-max y)
+        [min-z max-z] (get-min-max z)
+        xs (safe-subvec (:world game) min-x max-x)
+        xs-ys (map #(safe-subvec % min-y max-y) xs)
+        xs-ys-zs (map (fn [ys-zs] (map #(safe-subvec % min-z max-z) ys-zs)) xs-ys)]
+    (->> xs-ys-zs (apply concat) (apply concat) (remove nil?))))
 
 (defn- collides? [{{x1 :x y1 :y z1 :z} :position {w1 :width h1 :height d1 :depth} :volume :as entity1}
                   {{x2 :x y2 :y z2 :z} :position {w2 :width h2 :height d2 :depth} :volume :as entity2}]
@@ -40,7 +51,6 @@
         new-entity-x (update-in entity [:position :x] update-x-fn update-x-amount)
         new-entity-z (update-in entity [:position :z] update-z-fn update-z-amount)
         new-entity-xz (assoc-in new-entity-x [:position :z] (get-in new-entity-z [:position :z]))]
-    ; TODO: This is a performance bottleneck.
     (or (find-first #(not-any? (partial collides? %) collidables)
                     [new-entity-xz new-entity-x new-entity-z])
         entity)))
@@ -72,7 +82,7 @@
                        (* acceleration 0.5 dt-seconds dt-seconds))
             vy-delta (* acceleration dt-seconds)
             collidables (concat (vals (dissoc (:entities game) (last entity-index)))
-                                (world-blocks game))]
+                                (nearby-blocks (get-in game entity-index) game 3))]
         (-> game
             (update-in (concat entity-index [:velocity :vy]) + vy-delta)
             (update-in entity-index move-vertical y-delta collidables))))

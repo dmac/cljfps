@@ -36,7 +36,7 @@
 
 (defn handle-continuous-keyboard-input [game dt]
   (let [collidables (concat (vals (dissoc (:entities game) :player))
-                            (systems/world-blocks game))]
+                            (systems/nearby-blocks (get-in game [:entities :player]) game 3))]
     (reduce
       (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
       game

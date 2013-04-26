@@ -25,7 +25,8 @@
 (defn- render-all [{:keys [entities] :as game}]
   (doseq [entity (filter :render (vals entities))]
     ((get-in entity [:render :fn]) entity))
-  (doseq [entity (systems/world-blocks game)]
+  ; TODO: This hack only renders nearby blocks. This should be replaced by not rendering occluded blocks.
+  (doseq [entity (systems/nearby-blocks (get-in game [:entities :player]) game 20)]
     ((get-in entity [:render :fn]) entity)))
 
 (defn- update-all [game dt]
@@ -37,7 +38,7 @@
   (loop [last-time (get-time)
          game {:entities (into {} (map (fn [entity] [(:id entity) entity])
                                        [(entity :player
-                                          (position :x 0 :y 5 :z 0)
+                                          (position :x 0 :y 10 :z 0)
                                           (volume :width 0.5 :height 1.9 :depth 0.5)
                                           (orient :pitch 0 :yaw 180)
                                           (velocity :vy 0)
@@ -45,7 +46,7 @@
                                         (entity :floor
                                           (position :x 0 :y 0 :z 0)
                                           (volume :width 100 :height 0 :depth 100))]))
-               :world (load-level "room.dat")}]
+               :world (load-level "flat.dat")}]
     (if (Display/isCloseRequested)
       (System/exit 0)
       ;(Display/destroy)
