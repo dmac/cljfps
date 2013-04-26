@@ -35,7 +35,8 @@
     key-buffer))
 
 (defn handle-continuous-keyboard-input [game dt]
-  (let [collidables (vals (dissoc (:entities game) :player))]
+  (let [collidables (concat (vals (dissoc (:entities game) :player))
+                            (systems/world-blocks game))]
     (reduce
       (fn [game [k f]] (if (Keyboard/isKeyDown k) (f game) game))
       game
