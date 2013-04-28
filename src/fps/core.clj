@@ -22,11 +22,8 @@
       (reset! fps 0)
       (reset! last-fps new-time))))
 
-(defn- render-all [{:keys [entities] :as game}]
-  (doseq [entity (filter :render (vals entities))]
-    ((get-in entity [:render :fn]) entity))
-  ; TODO: This hack only renders nearby blocks. This should be replaced by not rendering occluded blocks.
-  (doseq [entity (systems/nearby-blocks (get-in game [:entities :player]) game 20)]
+(defn- render-all [{:keys [entities world] :as game}]
+  (doseq [entity (filter :render (conj (vals entities) world))]
     ((get-in entity [:render :fn]) entity)))
 
 (defn- update-all [game dt]
@@ -35,35 +32,38 @@
 (defn run []
   (graphics/init-window)
   (graphics/init-gl)
-  (loop [last-time (get-time)
-         game {:entities (into {} (map (fn [entity] [(:id entity) entity])
-                                       [(entity :player
-                                          (position :x 0 :y 10 :z 0)
-                                          (volume :width 0.5 :height 1.9 :depth 0.5)
-                                          (orient :pitch 0 :yaw 180)
-                                          (velocity :vy 0)
-                                          (flight :airborn false))
-                                        (entity :floor
-                                          (position :x 0 :y 0 :z 0)
-                                          (volume :width 100 :height 0 :depth 100))]))
-               :world (load-level "flat.dat")}]
-    (if (Display/isCloseRequested)
-      (System/exit 0)
-      ;(Display/destroy)
-      (do
-        (let [new-time (get-time)
-              dt (- new-time last-time)
-              new-game (-> game
-                           controls/handle-mouse-input
-                           (controls/handle-keyboard-input dt)
-                           (update-all dt))]
-          (graphics/clear-screen)
-          (graphics/look-through (get-in game [:entities :player]))
-          (render-all new-game)
-          (Display/update)
-          (Display/sync 60)
-          (update-fps)
-          (recur new-time new-game))))))
+  (let [world (load-level "flat.dat")]
+    (graphics/regenerate-world-vertex-data! world)
+    (loop [last-time (get-time)
+           game {:entities (into {} (map (fn [entity] [(:id entity) entity])
+                                         [(entity :player
+                                            (position :x 0 :y 5 :z 0)
+                                            (volume :width 0.5 :height 1.9 :depth 0.5)
+                                            (orient :pitch 0 :yaw 180)
+                                            (velocity :vy 0)
+                                            (flight :airborn false))
+                                          (entity :floor
+                                            (position :x 0 :y 0 :z 0)
+                                            (volume :width 100 :height 0 :depth 100))]))
+                 :world world}]
+      (if (Display/isCloseRequested)
+        (System/exit 0)
+        ;(Display/destroy)
+        (do
+          (let [new-time (get-time)
+                ; TODO: Make :dt a property of game
+                dt (- new-time last-time)
+                new-game (-> game
+                             controls/handle-mouse-input
+                             (controls/handle-keyboard-input dt)
+                             (update-all dt))]
+            (graphics/clear-screen)
+            (graphics/look-through (get-in game [:entities :player]))
+            (render-all new-game)
+            (Display/update)
+            (Display/sync 60)
+            (update-fps)
+            (recur new-time new-game)))))))
 
 (defn -main []
   (run))

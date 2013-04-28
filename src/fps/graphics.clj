@@ -10,7 +10,7 @@
 (def ^:private window-width 1024)
 (def ^:private window-height 768)
 
-(defn init-vertex-buffer []
+(defn init-vertex-buffer! []
   (let [int-buffer (BufferUtils/createIntBuffer 1)]
     (GL15/glGenBuffers int-buffer)
     (.get int-buffer 0)))
@@ -19,39 +19,50 @@
   (GL11/glClear (bit-or GL11/GL_COLOR_BUFFER_BIT GL11/GL_DEPTH_BUFFER_BIT))
   (GL11/glLoadIdentity))
 
-; TODO: To make this a little more sane, maybe use two VBOs instead of one interleaved VBO.
-(defn regenerate-box-vertex-data! [box]
-  (let [points (systems/bounding-points box)
-        face-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]
-        texture-points [[0 0] [0 1] [1 1] [1 0]]
-        vertex-data (->> face-indices
-                         (map (partial select-indices points))
-                         (map #(interleave % texture-points))
-                         (apply concat)
-                         (apply concat)
-                         (apply float-buffer))]
-    (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER (get-in box [:render :vertex-buffer-id]))
-    (GL15/glBufferData GL15/GL_ARRAY_BUFFER vertex-data GL15/GL_STATIC_DRAW)
-    box))
-
-; TODO: glDrawArrays is a bottleneck. Rendering in chunks should improve performance. Maybe one big chunk?
-(defn draw-box [box]
+(defn- draw-vertex-buffer [vertex-buffer-id num-vertices]
   ; [x y z tx ty]
   (let [sizeof-float 4
         vertex-size 3
         texture-size 2
         stride (* sizeof-float (+ vertex-size texture-size))
         vertex-offset 0
-        texture-offset (* vertex-size sizeof-float)
-        num-vertices 24]
-    ; Consider having each face be its own VBO and only draw visible ones
+        texture-offset (* vertex-size sizeof-float)]
     (GL11/glPushMatrix)
-    (GL11/glBindTexture GL11/GL_TEXTURE_2D (textures/get-texture-id (get-in box [:material :material])))
-    (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER (get-in box [:render :vertex-buffer-id]))
+    ; TODO: Use the world texture atlas here. Each block should define texture coordinates for itself which
+    ; map to the appropriate texture.
+    (GL11/glBindTexture GL11/GL_TEXTURE_2D (textures/get-texture-id :crate))
+    (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER vertex-buffer-id)
     (GL11/glVertexPointer vertex-size GL11/GL_FLOAT stride vertex-offset)
     (GL11/glTexCoordPointer texture-size GL11/GL_FLOAT stride texture-offset)
     (GL11/glDrawArrays GL11/GL_QUADS 0 num-vertices)
     (GL11/glPopMatrix)))
+
+(defn- block-vertex-data [block]
+  (let [points (systems/bounding-points block)
+        face-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]
+        ; TODO: Using a texture atlas will change these texture-points.
+        texture-points [[0 0] [0 1] [1 1] [1 0]]]
+    (->> face-indices
+         (map (partial select-indices points))
+         (map #(interleave % texture-points))
+         (apply concat)
+         (apply concat))))
+
+(defn- world-vertex-data [world]
+  (->> world
+       systems/world-blocks
+       (map block-vertex-data)
+       (apply concat)))
+
+(defn regenerate-world-vertex-data! [world]
+  (let [vertex-id (get-in world [:render :vertex-buffer-id])
+        vertex-data (world-vertex-data world)]
+    (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER vertex-id)
+    (GL15/glBufferData GL15/GL_ARRAY_BUFFER (apply float-buffer vertex-data) GL15/GL_STATIC_DRAW)))
+
+(defn draw-world [world]
+  (draw-vertex-buffer (get-in world [:render :vertex-buffer-id])
+                      (* 24 (count (systems/world-blocks world)))))
 
 (defn look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient :as entity}]
   {:pre [(and (:position entity) (:orient entity))]}

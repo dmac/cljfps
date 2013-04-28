@@ -1,16 +1,16 @@
 (ns fps.systems
   (:use [fps.utils :only [find-first safe-subvec]]))
 
-(defn world-blocks [game]
-  (->> game :world (apply concat) (apply concat) (remove nil?)))
+(defn world-blocks [world]
+  (->> world :grid (apply concat) (apply concat) (remove nil?)))
 
-(defn nearby-blocks [{{:keys [x y z]} :position :as entity} game radius]
+(defn nearby-blocks [{{:keys [x y z]} :position :as entity} world radius]
   {:pre [(:position entity)]}
   (let [get-min-max (juxt #(- % radius) #(+ % radius 1))
         [min-x max-x] (get-min-max x)
         [min-y max-y] (get-min-max y)
         [min-z max-z] (get-min-max z)
-        xs (safe-subvec (:world game) min-x max-x)
+        xs (safe-subvec (:grid world) min-x max-x)
         xs-ys (map #(safe-subvec % min-y max-y) xs)
         xs-ys-zs (map (fn [ys-zs] (map #(safe-subvec % min-z max-z) ys-zs)) xs-ys)]
     (->> xs-ys-zs (apply concat) (apply concat) (remove nil?))))
@@ -82,7 +82,7 @@
                        (* acceleration 0.5 dt-seconds dt-seconds))
             vy-delta (* acceleration dt-seconds)
             collidables (concat (vals (dissoc (:entities game) (last entity-index)))
-                                (nearby-blocks (get-in game entity-index) game 3))]
+                                (nearby-blocks (get-in game entity-index) (:world game) 3))]
         (-> game
             (update-in (concat entity-index [:velocity :vy]) + vy-delta)
             (update-in entity-index move-vertical y-delta collidables))))
