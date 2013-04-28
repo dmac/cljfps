@@ -20,23 +20,15 @@
 (defn get-texture-id [texture-key]
   (texture-key @texture-id-map))
 
-(defn- texture-coords-from-atlas-coords [[atlas-x atlas-y] atlas-width atlas-height]
-  ; Buffering each texture by a small amount prevents the border of one texture leaking onto another.
-  (let [buffer 0.001
-        step-x (/ 1 atlas-width)
-        step-y (/ 1 atlas-height)
-        buffered-step-x (- step-x (* buffer 2))
-        buffered-step-y (- step-y (* buffer 2))
-        top-left-x (+ (* atlas-x step-x) buffer)
-        top-left-y (+ (* atlas-y step-y) buffer)]
-    [[top-left-x top-left-y]
-     [(+ top-left-x buffered-step-x) top-left-y]
-     [(+ top-left-x buffered-step-x) (+ top-left-y buffered-step-y)]
-     [top-left-x (+ top-left-y buffered-step-y)]]))
+(defn- texture-coords-from-atlas-coords [[x y] texture-width texture-height atlas-width atlas-height]
+  [[(/ (+ x 0.5) atlas-width)                   (/ (+ y 0.5) atlas-height)]
+   [(/ (- (+ x texture-width) 0.5) atlas-width) (/ (+ y 0.5) atlas-height)]
+   [(/ (- (+ x texture-width) 0.5) atlas-width) (/ (- (+ y texture-height) 0.5) atlas-height)]
+   [(/ (+ x 0.5) atlas-width)                   (/ (- (+ y texture-height) 0.5) atlas-height)]])
 
 (defn texture-coords [texture-key]
   (texture-key (into {}
                      (for [[texture-key atlas-coords]
                            {:crate [0 0]
-                            :stone [1 0]}]
-                       [texture-key (texture-coords-from-atlas-coords atlas-coords 2 2)]))))
+                            :stone [256 0]}]
+                       [texture-key (texture-coords-from-atlas-coords atlas-coords 256 256 512 512)]))))
