@@ -44,5 +44,5 @@
                                   ; TODO: Align with world coordinates by removing half-steps?
                                   (position :x (+ x hbs) :y (+ y hbs) :z (+ z hbs))
                                   (volume :width block-size :height block-size :depth block-size)
-                                  (material :material material-type)))]))]
+                                  (material :type material-type)))]))]
     (assoc world-entity :grid world-grid)))

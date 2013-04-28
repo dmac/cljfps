@@ -40,7 +40,7 @@
   :depth 0)
 
 (defcomponent material
-  :material nil)
+  :type nil)
 
 (defcomponent render
   :fn #())

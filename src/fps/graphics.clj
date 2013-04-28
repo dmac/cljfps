@@ -19,7 +19,7 @@
   (GL11/glClear (bit-or GL11/GL_COLOR_BUFFER_BIT GL11/GL_DEPTH_BUFFER_BIT))
   (GL11/glLoadIdentity))
 
-(defn- draw-vertex-buffer [vertex-buffer-id num-vertices]
+(defn- draw-vertex-buffer [vertex-buffer-id num-vertices texture-key]
   ; [x y z tx ty]
   (let [sizeof-float 4
         vertex-size 3
@@ -28,9 +28,7 @@
         vertex-offset 0
         texture-offset (* vertex-size sizeof-float)]
     (GL11/glPushMatrix)
-    ; TODO: Use the world texture atlas here. Each block should define texture coordinates for itself which
-    ; map to the appropriate texture.
-    (GL11/glBindTexture GL11/GL_TEXTURE_2D (textures/get-texture-id :crate))
+    (GL11/glBindTexture GL11/GL_TEXTURE_2D (textures/get-texture-id texture-key))
     (GL15/glBindBuffer GL15/GL_ARRAY_BUFFER vertex-buffer-id)
     (GL11/glVertexPointer vertex-size GL11/GL_FLOAT stride vertex-offset)
     (GL11/glTexCoordPointer texture-size GL11/GL_FLOAT stride texture-offset)
@@ -40,8 +38,7 @@
 (defn- block-vertex-data [block]
   (let [points (systems/bounding-points block)
         face-indices [[0 1 2 3] [4 5 1 0] [7 6 5 4] [3 2 6 7] [3 7 4 0] [1 5 6 2]]
-        ; TODO: Using a texture atlas will change these texture-points.
-        texture-points [[0 0] [0 1] [1 1] [1 0]]]
+        texture-points (textures/texture-coords (get-in block [:material :type]))]
     (->> face-indices
          (map (partial select-indices points))
          (map #(interleave % texture-points))
@@ -62,7 +59,8 @@
 
 (defn draw-world [world]
   (draw-vertex-buffer (get-in world [:render :vertex-buffer-id])
-                      (* 24 (count (systems/world-blocks world)))))
+                      (* 24 (count (systems/world-blocks world)))
+                      :blocks))
 
 (defn look-through [{{:keys [x y z]} :position {:keys [pitch yaw]} :orient :as entity}]
   {:pre [(and (:position entity) (:orient entity))]}
