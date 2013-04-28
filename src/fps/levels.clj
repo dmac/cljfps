@@ -26,8 +26,8 @@
                        (render :fn graphics/draw-world
                                :init-fn #(assoc-in % [:render :vertex-buffer-id]
                                                    (graphics/init-vertex-buffer!))))
-        world-grid (reduce (fn [grid [x y z box]]
-                             (vassoc-in grid [x y z] box))
+        world-grid (reduce (fn [grid [x y z block]]
+                             (vassoc-in grid [x y z] block))
                            []
                            (for [[y slice] (indexed slices)
                                  [z row] (indexed (string/split slice #"\n"))
