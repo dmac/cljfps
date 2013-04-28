@@ -36,13 +36,11 @@
                                                        \S :stone
                                                        \C :crate
                                                        nil)
-                                       block-size 1
-                                       hbs (/ block-size 2.0)]]
+                                       block-size 1]]
                              [x y z
                               (when material-type
                                 (entity (next-id)
-                                  ; TODO: Align with world coordinates by removing half-steps?
-                                  (position :x (+ x hbs) :y (+ y hbs) :z (+ z hbs))
+                                  (position :x x :y y :z z)
                                   (volume :width block-size :height block-size :depth block-size)
                                   (material :type material-type)))]))]
     (assoc world-entity :grid world-grid)))
