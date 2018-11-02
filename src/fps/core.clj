@@ -8,6 +8,10 @@
            [org.lwjgl.opengl Display])
   (:gen-class))
 
+; TODO
+; - billboard enemies and items
+;   - as a proxy, maybe two perpendicular quads with same texture?
+
 (defn- get-time []
   (-> (Sys/getTime) (/ (Sys/getTimerResolution)) (* 1000) double))
 
